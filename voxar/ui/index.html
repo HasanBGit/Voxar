@@ -29,61 +29,70 @@
   --body: "Inter", system-ui, sans-serif;
   --arabic: "Tajawal", "Inter", system-ui, sans-serif;
   --serif: "Instrument Serif", Georgia, serif;
+  --stage-size: 22px;
+}
+:root[data-theme="dark"] {
+  --background: hsl(240 10% 4%); --foreground: hsl(0 0% 98%); --card: hsl(0 0% 6%); --muted: hsl(0 0% 12%);
+  --muted-foreground: hsl(0 0% 64%); --border: hsl(0 0% 15%); --primary: hsl(0 0% 98%); --primary-foreground: hsl(0 0% 9%);
+  --ok: #00d294; --bad: #ff8a80;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: hsl(240 10% 4%);
-    --foreground: hsl(0 0% 98%);
-    --card: hsl(0 0% 6%);
-    --muted: hsl(0 0% 12%);
-    --muted-foreground: hsl(0 0% 64%);
-    --border: hsl(0 0% 15%);
-    --primary: hsl(0 0% 98%);
-    --primary-foreground: hsl(0 0% 9%);
-    --ok: #00d294;
-    --bad: #ff8a80;
+  :root:not([data-theme="light"]) {
+    --background: hsl(240 10% 4%); --foreground: hsl(0 0% 98%); --card: hsl(0 0% 6%); --muted: hsl(0 0% 12%);
+    --muted-foreground: hsl(0 0% 64%); --border: hsl(0 0% 15%); --primary: hsl(0 0% 98%); --primary-foreground: hsl(0 0% 9%);
+    --ok: #00d294; --bad: #ff8a80;
   }
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--background); color: var(--foreground); font: 400 15px/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+html[lang="ar"] body { font-family: var(--arabic); font-size: 16px; }
 [hidden] { display: none !important; }
 .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 20px 0; }
 .brand { display: flex; align-items: center; gap: 10px; font: 700 20px/1 var(--heading); letter-spacing: -.02em; }
 .brand svg { width: 28px; height: 28px; }
+.tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 13px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--muted-foreground); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-foreground); }
 .pill[data-state="ok"] .dot { background: var(--ok); }
 .pill[data-state="bad"] .dot { background: var(--bad); }
-h1 { margin: 28px 0 6px; font: 400 clamp(36px, 5vw, 56px)/1.05 var(--serif); letter-spacing: -.01em; }
+h1 { margin: 28px 0 6px; font: 400 clamp(36px, 5vw, 56px)/1.1 var(--serif); letter-spacing: -.01em; }
+html[lang="ar"] h1 { font-family: var(--arabic); font-weight: 700; letter-spacing: 0; }
 .lede { margin: 0 0 28px; color: var(--muted-foreground); font-size: 16px; }
 .grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
 section.panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-height: 34px; }
 h2 { margin: 0; font: 700 20px/1.2 var(--heading); letter-spacing: -.01em; }
+html[lang="ar"] h2, html[lang="ar"] .brand { font-family: var(--arabic); letter-spacing: 0; }
+h3 { margin: 0; font: 600 14px/1.4 var(--body); color: var(--muted-foreground); }
 .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 button, .file-btn {
   appearance: none; font: 500 14px/1 var(--body); cursor: pointer; min-height: 44px; padding: 0 18px; border-radius: var(--radius);
   border: 1px solid var(--border); background: var(--card); color: var(--foreground); transition: background-color .15s, opacity .15s;
 }
+html[lang="ar"] button { font-family: var(--arabic); font-size: 15px; }
 button:hover:not(:disabled) { background: var(--muted); }
 button.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
 button.primary:hover:not(:disabled) { opacity: .88; background: var(--primary); }
 button.small { min-height: 34px; padding: 0 12px; font-size: 13px; color: var(--muted-foreground); }
+button.icon { min-width: 34px; padding: 0 8px; }
 button:disabled { opacity: .45; cursor: not-allowed; }
 button.live { background: var(--bad); border-color: var(--bad); color: #fff; }
-button.live .rec { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #fff; animation: pulse 1.2s ease-in-out infinite; }
+button.live .rec { display: inline-block; width: 8px; height: 8px; margin-inline-end: 8px; border-radius: 50%; background: #fff; animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .3; } }
+@keyframes spin { to { transform: rotate(360deg); } }
 button:focus-visible, textarea:focus-visible, input:focus-visible + .drop, .drop:focus-within { outline: 2px solid var(--foreground); outline-offset: 2px; }
 
-.stage { min-height: 260px; max-height: 420px; overflow: auto; padding: 16px 18px; border-radius: var(--radius); background: var(--muted); font: 400 22px/1.9 var(--arabic); overflow-wrap: anywhere; }
+.stage { min-height: 260px; max-height: 420px; overflow: auto; padding: 16px 18px; border-radius: var(--radius); background: var(--muted); font: 400 var(--stage-size)/1.9 var(--arabic); overflow-wrap: anywhere; }
 .stage .final { margin: 0 0 6px; }
 .stage .partial { color: var(--muted-foreground); }
 .stage.empty { color: var(--muted-foreground); font: 400 15px/1.7 var(--body); }
+html[lang="ar"] .stage.empty { font-family: var(--arabic); font-size: 16px; }
 .note { font-size: 14px; color: var(--muted-foreground); min-height: 1.6em; }
 .note.error { color: var(--bad); }
+.note.working::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-inline-end: 8px; vertical-align: -1px; border: 2px solid var(--border); border-top-color: var(--foreground); border-radius: 50%; animation: spin .8s linear infinite; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
 .level { display: flex; align-items: center; gap: 3px; height: 28px; }
 .level span { width: 4px; height: 100%; border-radius: 2px; background: var(--foreground); opacity: .75; transform: scaleY(.12); transform-origin: center; }
@@ -91,8 +100,9 @@ button:focus-visible, textarea:focus-visible, input:focus-visible + .drop, .drop
 .hint { color: var(--muted-foreground); font-size: 13px; margin: 0; }
 kbd { font: 500 12px var(--body); padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--muted); }
 
-.drop { display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; text-align: center; padding: 18px; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--muted-foreground); cursor: pointer; transition: border-color .15s, background-color .15s; }
+.drop { display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; text-align: center; padding: 18px; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--muted-foreground); cursor: pointer; transition: border-color .15s, background-color .15s, opacity .15s; }
 .drop:hover, .drop.over { border-color: var(--foreground); background: var(--muted); }
+.drop.busy { opacity: .5; pointer-events: none; }
 .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .drop strong { color: var(--foreground); font-weight: 500; }
 .check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted-foreground); cursor: pointer; }
@@ -101,10 +111,20 @@ textarea { width: 100%; min-height: 150px; resize: vertical; padding: 14px; bord
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { min-height: 34px; padding: 0 12px; font: 400 15px/1 var(--arabic); color: var(--foreground); }
 audio { width: 100%; }
-#tts-result a { color: var(--muted-foreground); font-size: 13px; }
-#tts-result a:hover { color: var(--foreground); }
+#tts-result a, .history a { color: var(--muted-foreground); font-size: 13px; }
+#tts-result a:hover, .history a:hover { color: var(--foreground); }
 .error-box { padding: 12px 14px; border: 1px solid var(--bad); border-radius: var(--radius); color: var(--bad); font-size: 14px; }
+.history { display: flex; flex-direction: column; gap: 6px; padding: 0; margin: 0; list-style: none; }
+.history li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; }
+.history .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--arabic); }
+.setup { padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--muted); display: flex; flex-direction: column; gap: 10px; }
+.setup ol { margin: 0; padding-inline-start: 22px; display: flex; flex-direction: column; gap: 10px; }
+.setup li > span { display: block; font-size: 14px; margin-bottom: 4px; }
+.cmd { display: flex; align-items: center; gap: 8px; }
+.cmd code { flex: 1; min-width: 0; overflow-x: auto; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); font: 500 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; direction: ltr; text-align: left; }
 footer { margin: 36px 0 48px; color: var(--muted-foreground); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 24px; }
+@media (max-width: 520px) { .wrap { padding: 0 16px; } section.panel { padding: 18px; } .stage { min-height: 200px; } }
+html.switching *, html.switching *::before { transition: none !important; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
@@ -115,90 +135,294 @@ footer { margin: 36px 0 48px; color: var(--muted-foreground); font-size: 13px; d
       <svg viewBox="0 0 160 160" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0D9488"/><stop offset="1" stop-color="#4F46E5"/></linearGradient></defs><circle cx="80" cy="80" r="78" fill="url(#g)"/><g fill="#fff"><rect x="34" y="68" width="11" height="24" rx="5.5"/><rect x="54" y="56" width="11" height="48" rx="5.5"/><rect x="74.5" y="42" width="11" height="76" rx="5.5"/><rect x="95" y="56" width="11" height="48" rx="5.5"/><rect x="115" y="68" width="11" height="24" rx="5.5"/></g></svg>
       voxar
     </div>
-    <span class="pill" id="status" data-state="idle"><span class="dot"></span><span id="status-text">Checking the server</span></span>
+    <div class="tools">
+      <button class="small" id="lang" type="button" lang="en" data-i18n-aria="lang_label">العربية</button>
+      <button class="small" id="theme" type="button" data-i18n-aria="theme_label"></button>
+      <span class="pill" id="status" data-state="idle" role="status"><span class="dot"></span><span id="status-text"></span></span>
+    </div>
   </header>
 
-  <h1>Speak Arabic. See it as text.</h1>
-  <p class="lede">Everything runs on this computer. No audio leaves it.</p>
+  <h1 data-i18n="title"></h1>
+  <p class="lede" data-i18n="lede"></p>
 
   <div class="grid">
     <section class="panel" aria-labelledby="listen-title">
       <div class="head">
-        <h2 id="listen-title">Listen</h2>
+        <h2 id="listen-title" data-i18n="listen"></h2>
         <div class="row">
-          <button class="small" id="copy" type="button" hidden>Copy text</button>
-          <button class="small" id="clear" type="button" hidden>Clear</button>
+          <button class="small icon" id="smaller" type="button" data-i18n-aria="smaller">A-</button>
+          <button class="small icon" id="larger" type="button" data-i18n-aria="larger">A+</button>
+          <button class="small" id="copy" type="button" hidden></button>
+          <button class="small" id="save" type="button" hidden data-i18n="save"></button>
+          <button class="small" id="clear" type="button" hidden data-i18n="clear"></button>
         </div>
       </div>
-      <div class="stage empty" id="stage" dir="auto" aria-live="polite">Press Start listening and speak, or drop an audio file below.</div>
+      <div id="setup-listen"></div>
+      <div class="stage empty" id="stage" dir="auto" aria-live="polite"></div>
       <div class="note" id="note" role="status"></div>
       <div class="controls">
-        <button class="primary" id="live-start" type="button">Start listening</button>
+        <button class="primary" id="live-start" type="button"></button>
         <div class="level" id="level" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
         <span class="elapsed" id="elapsed"></span>
         <span class="note" id="meta"></span>
       </div>
-      <p class="hint">Press <kbd>Space</kbd> to start or stop. Grey text is still changing; black lines are final.</p>
+      <p class="hint" id="listen-hint"></p>
       <label class="drop" id="drop">
         <input id="live-file" type="file" accept="audio/*">
-        <span><strong>Drop an audio file here</strong> or choose one</span>
-        <span>Any format your browser can play. Transcribed in seconds.</span>
+        <span><strong data-i18n="drop_strong"></strong> <span data-i18n="drop_or"></span></span>
+        <span data-i18n="drop_sub"></span>
       </label>
-      <label class="check"><input type="checkbox" id="as-live"> Play the file as live, at the speed of speech</label>
+      <label class="check"><input type="checkbox" id="as-live"> <span data-i18n="as_live"></span></label>
     </section>
 
     <section class="panel" aria-labelledby="speak-title">
-      <div class="head"><h2 id="speak-title">Speak</h2></div>
-      <textarea id="text" dir="auto" placeholder="اكتب نصًا هنا" aria-label="Text to speak">يا أهلاً وسهلاً، كيف حالكم؟ إن شاء الله طيبين وبأحسن حال.</textarea>
-      <div class="chips" id="chips" aria-label="Sample sentences"></div>
-      <div class="row"><button class="primary" id="speak" type="button">Speak</button></div>
-      <p class="hint">Press <kbd>Ctrl</kbd> or <kbd>Cmd</kbd> + <kbd>Enter</kbd>. Write without full diacritics; Latin-script words are skipped.</p>
+      <div class="head"><h2 id="speak-title" data-i18n="speak"></h2></div>
+      <div id="setup-speak"></div>
+      <textarea id="text" dir="auto" data-i18n-aria="text_label" data-i18n-placeholder="text_placeholder">يا أهلاً وسهلاً، كيف حالكم؟ إن شاء الله طيبين وبأحسن حال.</textarea>
+      <div class="chips" id="chips" data-i18n-aria="samples"></div>
+      <div class="row"><button class="primary" id="speak" type="button"></button></div>
+      <p class="hint" id="speak-hint"></p>
       <div id="tts-result"></div>
       <div class="note" id="tts-meta"></div>
+      <div id="history-box" hidden>
+        <h3 data-i18n="earlier"></h3>
+        <ul class="history" id="history"></ul>
+      </div>
     </section>
   </div>
 
   <footer>
     <span id="engines"></span>
-    <span>Pre-alpha. Accuracy on real speakers and on Saudi dialect has not been measured.</span>
+    <span data-i18n="footer"></span>
   </footer>
 </div>
 
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
-const EMPTY = "Press Start listening and speak, or drop an audio file below.";
 const SAMPLES = ["يا أهلاً وسهلاً، كيف حالكم؟", "الطقس اليوم حلو والسما صافية مرة.", "شكرًا لك على اتصالك بخدمة العملاء."];
 
-// ---- status and engines
-function setStatus(state, text) { $("status").dataset.state = state; $("status-text").textContent = text; }
+// ---- preferences (language, theme, text size): remembered when the browser allows it, never required
+const prefs = {
+  get(key, fallback) { try { return localStorage.getItem("voxar." + key) || fallback; } catch (e) { return fallback; } },
+  set(key, value) { try { localStorage.setItem("voxar." + key, value); } catch (e) { /* private mode: fine */ } },
+};
+
+// ---- interface text, English and Arabic; {name} marks a value filled in at run time
+const STRINGS = {
+  en: {
+    title: "Speak Arabic. See it as text.", lede: "Everything runs on this computer. No audio leaves it.",
+    listen: "Listen", speak: "Speak", clear: "Clear", save: "Save text", copy: "Copy text", copy_short: "Copy", copied: "Copied", copy_failed: "Copy failed",
+    start: "Start listening", stop: "Stop", listening: "Listening...", connecting: "Connecting...",
+    empty: "Press Start listening and speak, or drop an audio file below.",
+    hint_listen: "Press {space} to start or stop, {esc} also stops. Grey text is still changing; black lines are final.",
+    hint_speak: "Press {ctrl} + {enter}. Write without full diacritics; Latin-script words are skipped.",
+    drop_strong: "Drop an audio file here", drop_or: "or choose one", drop_sub: "Any format your browser can play. Transcribed in seconds.",
+    as_live: "Play the file as live, at the speed of speech",
+    text_placeholder: "اكتب نصًا هنا", text_label: "Text to speak", samples: "Sample sentences",
+    speaking: "Speaking...", write_first: "Write some text first.", download: "Download WAV", earlier: "Earlier", play: "Play", use: "Use",
+    generated: "Generated in {s} s", audio_in: "{a} s of audio in {b} s", first_text: "First text after {s} s",
+    transcribing: "Transcribing {name}...", no_speech_in: "No speech was recognized in {name}.", no_speech: "No speech was recognized.",
+    status_checking: "Checking the server", status_ready: "Ready", status_no_stt: "No speech-to-text engine installed", status_down: "Cannot reach the server",
+    engines: "Speech to text: {stt}   Text to speech: {tts}", not_installed: "not installed",
+    footer: "Pre-alpha. Accuracy on real speakers and on Saudi dialect has not been measured.",
+    lang_label: "Switch the language to Arabic", theme_label: "Change the colour theme", theme_auto: "Theme: auto", theme_light: "Theme: light", theme_dark: "Theme: dark",
+    smaller: "Smaller text", larger: "Larger text",
+    setup_stt: "Set up speech to text", setup_tts: "Set up text to speech",
+    step_install: "Install", step_models: "Download the model (about 31 MB)", step_restart: "Restart the server",
+    step_plugin: "Install the plugin", step_voice: "Download the voice (about 31 MB)", step_restart_voice: "Restart with the voice enabled",
+    stop_first: "Stop listening before adding a file.",
+    err_audio: "This browser cannot read that audio. Try a WAV, MP3 or M4A file.", err_audio_file: "The browser could not read that audio file.",
+    err_timeout: "The server did not answer within 3 minutes. Check that voxar serve is still running.",
+    err_speak_timeout: "The server did not answer within 3 minutes.",
+    err_failed: "Request failed ({status})", err_limit: "The server is at its live-stream limit. Try again in a moment.",
+    err_connect: "Could not open the live connection. Check that voxar serve is running and that this page was opened from its address.",
+    err_capture: "This browser cannot capture live audio. Use a current Chrome, Edge, Firefox or Safari on localhost.",
+    err_mic: "The microphone is blocked. Allow microphone access for this page in the browser's address bar, then try again.",
+  },
+  ar: {
+    title: "تحدّث بالعربية وشاهد كلامك نصًا.", lede: "كل شيء يعمل على جهازك، ولا يخرج أي صوت منه.",
+    listen: "استماع", speak: "نطق", clear: "مسح", save: "حفظ النص", copy: "نسخ النص", copy_short: "نسخ", copied: "تم النسخ", copy_failed: "تعذّر النسخ",
+    start: "ابدأ الاستماع", stop: "إيقاف", listening: "جارٍ الاستماع...", connecting: "جارٍ الاتصال...",
+    empty: "اضغط «ابدأ الاستماع» وتكلّم، أو أسقط ملفًا صوتيًا في الأسفل.",
+    hint_listen: "اضغط {space} للبدء أو الإيقاف، و{esc} يوقف أيضًا. النص الرمادي ما زال يتغيّر، والأسود نهائي.",
+    hint_speak: "اضغط {ctrl} + {enter}. اكتب بدون تشكيل كامل؛ الكلمات اللاتينية تُتجاهل.",
+    drop_strong: "أسقط ملفًا صوتيًا هنا", drop_or: "أو اختر ملفًا", drop_sub: "أي صيغة يشغّلها متصفحك. يُفرَّغ خلال ثوانٍ.",
+    as_live: "شغّل الملف كأنه بثّ مباشر بسرعة الكلام",
+    text_placeholder: "اكتب نصًا هنا", text_label: "النص المراد نطقه", samples: "جمل جاهزة",
+    speaking: "جارٍ النطق...", write_first: "اكتب نصًا أولًا.", download: "تنزيل WAV", earlier: "السابقة", play: "تشغيل", use: "استخدام",
+    generated: "تم التوليد في {s} ث", audio_in: "{a} ث من الصوت في {b} ث", first_text: "أول نص بعد {s} ث",
+    transcribing: "جارٍ تفريغ {name}...", no_speech_in: "لم يُتعرَّف على كلام في {name}.", no_speech: "لم يُتعرَّف على أي كلام.",
+    status_checking: "جارٍ فحص الخادم", status_ready: "جاهز", status_no_stt: "لا يوجد محرّك لتحويل الكلام إلى نص", status_down: "تعذّر الوصول إلى الخادم",
+    engines: "الكلام إلى نص: {stt}   النص إلى كلام: {tts}", not_installed: "غير مثبّت",
+    footer: "نسخة تجريبية مبكرة. لم تُقَس الدقة مع متحدثين حقيقيين ولا مع اللهجة السعودية.",
+    lang_label: "تغيير اللغة إلى الإنجليزية", theme_label: "تغيير مظهر الألوان", theme_auto: "المظهر: تلقائي", theme_light: "المظهر: فاتح", theme_dark: "المظهر: داكن",
+    smaller: "تصغير النص", larger: "تكبير النص",
+    setup_stt: "إعداد تحويل الكلام إلى نص", setup_tts: "إعداد تحويل النص إلى كلام",
+    step_install: "التثبيت", step_models: "نزّل النموذج (حوالي 31 ميغابايت)", step_restart: "أعد تشغيل الخادم",
+    step_plugin: "ثبّت الإضافة", step_voice: "نزّل الصوت (حوالي 31 ميغابايت)", step_restart_voice: "أعد التشغيل مع تفعيل الصوت",
+    stop_first: "أوقف الاستماع قبل إضافة ملف.",
+    err_audio: "لا يستطيع هذا المتصفح قراءة هذا الصوت. جرّب ملف WAV أو MP3 أو M4A.", err_audio_file: "تعذّر على المتصفح قراءة الملف الصوتي.",
+    err_timeout: "لم يردّ الخادم خلال 3 دقائق. تأكد أن voxar serve ما زال يعمل.",
+    err_speak_timeout: "لم يردّ الخادم خلال 3 دقائق.",
+    err_failed: "فشل الطلب ({status})", err_limit: "وصل الخادم إلى حدّ البثّ المباشر. حاول بعد قليل.",
+    err_connect: "تعذّر فتح الاتصال المباشر. تأكد أن voxar serve يعمل وأنك فتحت هذه الصفحة من عنوانه.",
+    err_capture: "لا يستطيع هذا المتصفح التقاط الصوت المباشر. استخدم نسخة حديثة من Chrome أو Edge أو Firefox أو Safari على localhost.",
+    err_mic: "الميكروفون محجوب. اسمح بالوصول إلى الميكروفون لهذه الصفحة من شريط عنوان المتصفح ثم أعد المحاولة.",
+  },
+};
+let lang = prefs.get("lang", (navigator.language || "en").toLowerCase().startsWith("ar") ? "ar" : "en");
+if (!STRINGS[lang]) lang = "en";
+
+function t(key, vars) {
+  let text = (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.en[key] || key;
+  if (vars) for (const name of Object.keys(vars)) text = text.split("{" + name + "}").join(vars[name]);
+  return text;
+}
+// A message is either a translation key with values, or raw text (for example an error the server sent).
+const msg = (key, vars) => ({ key, vars });
+const raw = (text) => ({ raw: text });
+const say = (m) => (m ? (m.raw !== undefined ? m.raw : t(m.key, m.vars)) : "");
+class UserError extends Error { constructor(m) { super(say(m)); this.msg = m; } }
+
+function kbd(text) { return "<kbd>" + text + "</kbd>"; }
+function fillHint(el, key, keys) {
+  const vars = {}; for (const name of Object.keys(keys)) vars[name] = kbd(keys[name]);
+  el.innerHTML = t(key, vars);
+}
+
+// ---- state shown on screen; each piece re-renders when the language changes
+const view = { status: ["idle", msg("status_checking")], note: [null, false], meta: null, ttsMeta: null, speakError: null, health: null };
+
+function renderStatus() { $("status").dataset.state = view.status[0]; $("status-text").textContent = say(view.status[1]); }
+function setStatus(state, m) { view.status = [state, m]; renderStatus(); }
+function renderNote() { const [m, kind] = view.note; $("note").textContent = say(m); $("note").className = "note" + (kind === "error" ? " error" : kind === "working" ? " working" : ""); }
+function setNote(m, kind) { view.note = [m || null, kind || null]; renderNote(); }
+function renderMeta() { $("meta").textContent = say(view.meta); }
+function setMeta(m) { view.meta = m || null; renderMeta(); }
+function renderTtsMeta() { $("tts-meta").textContent = say(view.ttsMeta); }
+function renderSpeakError() {
+  if (!view.speakError) return;
+  $("tts-result").textContent = "";
+  const box = document.createElement("div"); box.className = "error-box"; box.textContent = say(view.speakError); $("tts-result").appendChild(box);
+}
+function showSpeakError(m) { view.speakError = m; renderSpeakError(); }
+
+// ---- theme: follow the system, or force light or dark
+const THEMES = ["auto", "light", "dark"];
+let theme = prefs.get("theme", "auto");
+if (!THEMES.includes(theme)) theme = "auto";
+function applyTheme() {
+  if (theme === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.dataset.theme = theme;
+  $("theme").textContent = t("theme_" + theme);
+}
+$("theme").addEventListener("click", () => {
+  theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]; prefs.set("theme", theme);
+  const html = document.documentElement;
+  html.classList.add("switching");               // every colour changes at once instead of buttons fading behind the page
+  applyTheme();
+  setTimeout(() => html.classList.remove("switching"), 60);
+});
+
+// ---- transcript text size
+let stageSize = Math.max(16, Math.min(40, parseInt(prefs.get("size", "22"), 10) || 22));
+function applySize() {
+  document.documentElement.style.setProperty("--stage-size", stageSize + "px");
+  $("smaller").disabled = stageSize <= 16; $("larger").disabled = stageSize >= 40;
+}
+function changeSize(step) { stageSize = Math.max(16, Math.min(40, stageSize + step)); prefs.set("size", String(stageSize)); applySize(); }
+$("smaller").addEventListener("click", () => changeSize(-2));
+$("larger").addEventListener("click", () => changeSize(2));
+
+// ---- language
+function applyLanguage() {
+  const html = document.documentElement;
+  html.lang = lang; html.dir = lang === "ar" ? "rtl" : "ltr";
+  document.title = "voxar";
+  document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-aria]").forEach((el) => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  $("lang").textContent = lang === "ar" ? "English" : "العربية";
+  $("lang").lang = lang === "ar" ? "en" : "ar";
+  $("lang").setAttribute("aria-label", t("lang_label"));
+  fillHint($("listen-hint"), "hint_listen", { space: "Space", esc: "Esc" });
+  fillHint($("speak-hint"), "hint_speak", { ctrl: "Ctrl/Cmd", enter: "Enter" });
+  $("copy").textContent = t("copy");
+  applyTheme(); renderStatus(); renderNote(); renderMeta(); renderTtsMeta(); renderSpeakError();
+  renderEngines(); renderSetup(); renderStage(); renderLiveButton(); renderSpeakButton(); renderHistory();
+}
+$("lang").addEventListener("click", () => { lang = lang === "ar" ? "en" : "ar"; prefs.set("lang", lang); applyLanguage(); });
+
+// ---- engines and first-run help
+function renderEngines() {
+  const health = view.health;
+  $("engines").textContent = health ? t("engines", {
+    stt: health.recognizers.length ? health.recognizers.join(", ") : t("not_installed"),
+    tts: health.synthesizers.length ? health.synthesizers.join(", ") : t("not_installed"),
+  }) : "";
+}
+
+function commandRow(command) {
+  const row = document.createElement("div"); row.className = "cmd";
+  const code = document.createElement("code"); code.textContent = command;
+  const button = document.createElement("button"); button.type = "button"; button.className = "small"; button.textContent = t("copy_short");
+  button.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(command); button.textContent = t("copied"); } catch (e) { button.textContent = t("copy_failed"); }
+    setTimeout(() => { button.textContent = t("copy_short"); }, 1500);
+  });
+  row.append(code, button);
+  return row;
+}
+
+function setupCard(titleKey, steps) {
+  const card = document.createElement("div"); card.className = "setup";
+  const title = document.createElement("h3"); title.textContent = t(titleKey); card.appendChild(title);
+  const list = document.createElement("ol");
+  for (const [key, command] of steps) {
+    const item = document.createElement("li"), label = document.createElement("span");
+    label.textContent = t(key); item.append(label, commandRow(command)); list.appendChild(item);
+  }
+  card.appendChild(list);
+  return card;
+}
+
+function renderSetup() {
+  const health = view.health, listen = $("setup-listen"), speakBox = $("setup-speak");
+  listen.textContent = ""; speakBox.textContent = "";
+  if (!health) return;
+  if (!health.recognizers.length) listen.appendChild(setupCard("setup_stt", [["step_install", "make setup"], ["step_models", "make models"], ["step_restart", "make run"]]));
+  if (!health.synthesizers.length) speakBox.appendChild(setupCard("setup_tts", [
+    ["step_plugin", "uv pip install -e plugins/voxar-tts-espeak"],
+    ["step_voice", "uv run voxar models pull nabra-saudi-7m --accept-license"],
+    ["step_restart_voice", "VOXAR_SYNTHESIZER=nabra-saudi make run"],
+  ]));
+}
 
 async function loadHealth() {
   try {
     const health = await (await fetch("/health")).json();
+    view.health = health;
     const stt = health.recognizers.length > 0, tts = health.synthesizers.length > 0;
-    setStatus(stt ? "ok" : "bad", stt ? "Ready" : "No speech-to-text engine installed");
-    $("engines").textContent = "Speech to text: " + (stt ? health.recognizers.join(", ") : "not installed") +
-      "   Text to speech: " + (tts ? health.synthesizers.join(", ") : "not installed");
+    setStatus(stt ? "ok" : "bad", msg(stt ? "status_ready" : "status_no_stt"));
     $("live-start").disabled = !stt;
     $("speak").disabled = !tts;
     document.querySelectorAll(".chip").forEach((chip) => { chip.disabled = !tts; });
-    if (!stt) setNote("No speech-to-text engine is installed. Install voxar[moonshine], pull the model, then restart the server.", true);
-    if (!tts) showSpeakError("No text-to-speech engine is installed. Install the plugin and set VOXAR_SYNTHESIZER=nabra-saudi, then restart the server.");
+    $("text").disabled = !tts;
+    renderEngines(); renderSetup();
   } catch (e) {
-    setStatus("bad", "Cannot reach the server");
+    setStatus("bad", msg("status_down"));
   }
 }
 
 // ---- the transcript: one surface for live, file and one-shot results
 const transcript = { finals: [], partial: "" };
 
-function setNote(text, isError) { $("note").textContent = text; $("note").className = "note" + (isError ? " error" : ""); }
+function transcriptText() { return [...transcript.finals, transcript.partial].filter(Boolean).join("\n"); }
 
 function renderStage() {
   const box = $("stage"), has = transcript.finals.length > 0 || transcript.partial;
-  $("copy").hidden = $("clear").hidden = !has;
-  if (!has) { box.className = "stage empty"; box.textContent = live ? "Listening..." : EMPTY; return; }
+  $("copy").hidden = $("clear").hidden = $("save").hidden = !has;
+  if (!has) { box.className = "stage empty"; box.textContent = live ? t("listening") : t("empty"); return; }
   box.className = "stage";
   box.textContent = "";
   for (const line of transcript.finals) {
@@ -211,11 +435,17 @@ function renderStage() {
 }
 
 $("copy").addEventListener("click", async () => {
-  const text = [...transcript.finals, transcript.partial].filter(Boolean).join("\n");
-  try { await navigator.clipboard.writeText(text); $("copy").textContent = "Copied"; } catch (e) { $("copy").textContent = "Copy failed"; }
-  setTimeout(() => { $("copy").textContent = "Copy text"; }, 1500);
+  try { await navigator.clipboard.writeText(transcriptText()); $("copy").textContent = t("copied"); } catch (e) { $("copy").textContent = t("copy_failed"); }
+  setTimeout(() => { $("copy").textContent = t("copy"); }, 1500);
 });
-$("clear").addEventListener("click", () => { transcript.finals = []; transcript.partial = ""; setNote(""); $("meta").textContent = ""; renderStage(); });
+$("save").addEventListener("click", () => {
+  const blob = new Blob(["﻿" + transcriptText() + "\n"], { type: "text/plain;charset=utf-8" });  // the BOM keeps Arabic readable in Notepad
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob); link.download = "voxar-transcript.txt";
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+});
+$("clear").addEventListener("click", () => { transcript.finals = []; transcript.partial = ""; setNote(null); setMeta(null); renderStage(); });
 
 // ---- audio helpers: any audio the browser can decode becomes 16 kHz mono 16-bit samples
 let sharedContext = null;
@@ -230,7 +460,7 @@ function audioContext() {
 
 function withTimeout(promise, ms, message) {
   let timer;
-  const limit = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); });
+  const limit = new Promise((_, reject) => { timer = setTimeout(() => reject(new UserError(message)), ms); });
   return Promise.race([promise, limit]).finally(() => clearTimeout(timer));
 }
 
@@ -253,7 +483,7 @@ function toInt16(floats) {
 async function toWav16k(arrayBuffer) {
   let decoded;
   try { decoded = await audioContext().decodeAudioData(arrayBuffer); }
-  catch (e) { throw new Error("This browser cannot read that audio. Try a WAV, MP3 or M4A file."); }
+  catch (e) { throw new UserError(msg("err_audio")); }
   const channels = [];
   for (let c = 0; c < decoded.numberOfChannels; c++) channels.push(decoded.getChannelData(c));
   let samples = new Float32Array(decoded.length);
@@ -274,27 +504,35 @@ async function toWav16k(arrayBuffer) {
 }
 
 // ---- a file: transcribed at once (fast), or played as live
+function setBusy(busy) {
+  $("drop").classList.toggle("busy", busy);
+  $("live-file").disabled = busy;
+  $("stage").setAttribute("aria-busy", busy ? "true" : "false");
+}
+
 async function transcribeFile(file) {
-  setNote("Transcribing " + file.name + "..."); $("meta").textContent = "";
+  setNote(msg("transcribing", { name: file.name }), "working"); setMeta(null); setBusy(true);
   try {
-    const { blob, seconds } = await withTimeout(toWav16k(await file.arrayBuffer()), 20000, "The browser could not read that audio file.");
+    const { blob, seconds } = await withTimeout(toWav16k(await file.arrayBuffer()), 20000, msg("err_audio_file"));
     const started = performance.now();
     const response = await fetch("/v1/transcribe", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: blob, signal: AbortSignal.timeout(180000) });
     const body = await response.json();
-    if (!response.ok) throw new Error(body.error || ("Request failed (" + response.status + ")"));
+    if (!response.ok) throw body.error ? new UserError(raw(body.error)) : new UserError(msg("err_failed", { status: response.status }));
     const took = (performance.now() - started) / 1000;
-    if (body.text) { transcript.finals.push(body.text); setNote(""); }
-    else setNote("No speech was recognized in " + file.name + ".");
-    $("meta").textContent = seconds.toFixed(1) + " s of audio in " + took.toFixed(2) + " s";
+    if (body.text) { transcript.finals.push(body.text); setNote(null); }
+    else setNote(msg("no_speech_in", { name: file.name }));
+    setMeta(msg("audio_in", { a: seconds.toFixed(1), b: took.toFixed(2) }));
     renderStage();
   } catch (e) {
-    setNote(e.name === "TimeoutError" ? "The server did not answer within 3 minutes. Check that voxar serve is still running." : e.message, true);
+    setNote(e.name === "TimeoutError" ? msg("err_timeout") : (e.msg || raw(e.message)), "error");
+  } finally {
+    setBusy(false);
   }
 }
 
 function handleFile(file) {
   if (!file) return;
-  if (live) { setNote("Stop listening before adding a file.", true); return; }
+  if (live) { setNote(msg("stop_first"), "error"); return; }
   if ($("as-live").checked) startLive(fileSource(file)); else transcribeFile(file);
 }
 $("live-file").addEventListener("change", (event) => { const file = event.target.files[0]; event.target.value = ""; handleFile(file); });
@@ -317,11 +555,15 @@ function setLevel(rms) {
   }
 }
 
-function setLiveRunning(running) {
+function renderLiveButton() {
   const button = $("live-start");
-  button.classList.toggle("live", running);
-  if (running) button.innerHTML = '<span class="rec"></span>Stop'; else button.textContent = "Start listening";
-  button.disabled = false;
+  button.classList.toggle("live", !!live);
+  if (live) button.innerHTML = '<span class="rec"></span>' + t("stop"); else button.textContent = t("start");
+}
+
+function setLiveRunning(running) {
+  renderLiveButton();
+  $("live-start").disabled = false;
   $("live-file").disabled = running;
   clearInterval(tickTimer);
   if (!running) { setLevel(0); $("elapsed").textContent = ""; return; }
@@ -331,8 +573,7 @@ function setLiveRunning(running) {
 }
 
 function liveMeta(session) {
-  const first = session.firstText === null ? "" : "First text after " + (session.firstText / 1000).toFixed(1) + " s";
-  $("meta").textContent = first;
+  setMeta(session.firstText === null ? null : msg("first_text", { s: (session.firstText / 1000).toFixed(1) }));
 }
 
 function sendFrame(session, frame) {
@@ -361,11 +602,10 @@ function finishLive(session, closeEvent) {
   if (live === session) live = null;
   setLiveRunning(false);
   transcript.partial = "";
-  if (session.error) setNote(session.error, true);
-  else if (!session.opened) setNote(closeEvent.code === 1013 ? "The server is at its live-stream limit. Try again in a moment."
-    : "Could not open the live connection. Check that voxar serve is running and that this page was opened from its address.", true);
-  else if (!session.heard) setNote("No speech was recognized.");
-  else setNote("");
+  if (session.error) setNote(raw(session.error), "error");
+  else if (!session.opened) setNote(msg(closeEvent.code === 1013 ? "err_limit" : "err_connect"), "error");
+  else if (!session.heard) setNote(msg("no_speech"));
+  else setNote(null);
   renderStage();
 }
 
@@ -373,12 +613,12 @@ async function startLive(makeSource) {
   if (live) return;
   const session = { ws: new WebSocket(liveUrl()), source: null, firstText: null, began: performance.now(), opened: false, ending: false, error: null, heard: false };
   live = session;
-  setLiveRunning(true); setNote("Connecting..."); $("meta").textContent = "";
+  setLiveRunning(true); setNote(msg("connecting"), "working"); setMeta(null); renderStage();
   session.ws.binaryType = "arraybuffer";
   session.ws.onmessage = (e) => { const event = JSON.parse(e.data); if (event.text) session.heard = true; handleLiveEvent(session, event); };
   session.ws.onclose = (e) => finishLive(session, e);
   session.ws.onopen = async () => {
-    session.opened = true; setNote(""); renderStage();
+    session.opened = true; setNote(null); renderStage();
     try {
       session.source = await makeSource((frame) => sendFrame(session, frame), () => endLive(session), setLevel);
       if (session.ending) session.source.stop();
@@ -387,10 +627,10 @@ async function startLive(makeSource) {
 }
 
 async function micSource(send, onEnd, onLevel) {
-  if (!navigator.mediaDevices || !window.AudioWorklet) throw new Error("This browser cannot capture live audio. Use a current Chrome, Edge, Firefox or Safari on http://localhost.");
+  if (!navigator.mediaDevices || !window.AudioWorklet) throw new UserError(msg("err_capture"));
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch (e) { throw new Error("The microphone is blocked. Allow microphone access for this page in the browser's address bar, then try again."); }
+  catch (e) { throw new UserError(msg("err_mic")); }
   const Context = window.AudioContext || window.webkitAudioContext;
   let context;
   try { context = new Context({ sampleRate: 16000 }); } catch (e) { context = new Context(); }
@@ -415,7 +655,7 @@ async function micSource(send, onEnd, onLevel) {
 
 function fileSource(file) {
   return async (send, onEnd, onLevel) => {
-    const { blob } = await withTimeout(toWav16k(await file.arrayBuffer()), 20000, "The browser could not read that audio file.");
+    const { blob } = await withTimeout(toWav16k(await file.arrayBuffer()), 20000, msg("err_audio_file"));
     const pcm = new Int16Array((await blob.arrayBuffer()).slice(44));
     let position = 0, stopped = false;
     const started = performance.now();
@@ -442,37 +682,62 @@ function toggleLive() {
 $("live-start").addEventListener("click", toggleLive);
 document.addEventListener("keydown", (e) => {
   if (e.code === "Space" && e.target === document.body) { e.preventDefault(); toggleLive(); }
+  else if (e.code === "Escape" && live) { e.preventDefault(); toggleLive(); }
 });
 
-// ---- text to speech
-let speakAbort = null;
-function showSpeakError(message) {
-  $("tts-result").textContent = "";
-  const box = document.createElement("div"); box.className = "error-box"; box.textContent = message; $("tts-result").appendChild(box);
+// ---- text to speech, with the last few clips kept for replay
+let speakAbort = null, speaking = false;
+const clips = [];  // newest first: { text, url }
+const MAX_CLIPS = 6;
+
+function renderSpeakButton() { $("speak").textContent = t(speaking ? "speaking" : "speak"); }
+
+function renderHistory() {
+  const older = clips.slice(1), list = $("history");
+  $("history-box").hidden = older.length === 0;
+  list.textContent = "";
+  for (const clip of older) {
+    const item = document.createElement("li");
+    const what = document.createElement("span"); what.className = "what"; what.dir = "auto"; what.textContent = clip.text; what.title = clip.text;
+    const play = document.createElement("button"); play.type = "button"; play.className = "small"; play.textContent = t("play");
+    play.addEventListener("click", () => { new Audio(clip.url).play().catch(() => {}); });
+    const again = document.createElement("button"); again.type = "button"; again.className = "small"; again.textContent = t("use");
+    again.addEventListener("click", () => { $("text").value = clip.text; $("text").focus(); });
+    const save = document.createElement("a"); save.href = clip.url; save.download = "voxar-speech.wav"; save.textContent = "WAV";
+    item.append(what, play, again, save); list.appendChild(item);
+  }
+}
+
+function rememberClip(text, url) {
+  clips.unshift({ text, url });
+  while (clips.length > MAX_CLIPS) URL.revokeObjectURL(clips.pop().url);
+  renderHistory();
 }
 
 async function speak() {
-  const button = $("speak"), result = $("tts-result");
+  const result = $("tts-result");
   const text = $("text").value.trim();
-  result.textContent = ""; $("tts-meta").textContent = "";
-  if (!text) { showSpeakError("Write some text first."); return; }
+  result.textContent = ""; view.speakError = null; view.ttsMeta = null; renderTtsMeta();
+  if (!text) { showSpeakError(msg("write_first")); return; }
   if (speakAbort) speakAbort.abort();               // a newer request replaces an older one
   const abort = speakAbort = new AbortController();
-  button.disabled = true; button.textContent = "Speaking...";
+  speaking = true; $("speak").disabled = true; renderSpeakButton();
   try {
     const started = performance.now();
     const response = await fetch("/v1/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }), signal: AbortSignal.any([abort.signal, AbortSignal.timeout(180000)]) });
-    if (!response.ok) { const body = await response.json(); throw new Error(body.error || ("Request failed (" + response.status + ")")); }
+    if (!response.ok) { const body = await response.json(); throw body.error ? new UserError(raw(body.error)) : new UserError(msg("err_failed", { status: response.status })); }
+    const url = URL.createObjectURL(await response.blob());
     const audio = document.createElement("audio");
-    audio.controls = true; audio.src = URL.createObjectURL(await response.blob());
+    audio.controls = true; audio.src = url;
     const link = document.createElement("a");
-    link.href = audio.src; link.download = "voxar-speech.wav"; link.textContent = "Download WAV";
+    link.href = url; link.download = "voxar-speech.wav"; link.textContent = t("download");
     result.textContent = ""; result.appendChild(audio); result.appendChild(link); audio.play().catch(() => {});
-    $("tts-meta").textContent = "Generated in " + ((performance.now() - started) / 1000).toFixed(2) + " s";
+    rememberClip(text, url);
+    view.ttsMeta = msg("generated", { s: ((performance.now() - started) / 1000).toFixed(2) }); renderTtsMeta();
   } catch (e) {
-    if (e.name !== "AbortError") showSpeakError(e.name === "TimeoutError" ? "The server did not answer within 3 minutes." : e.message);
+    if (e.name !== "AbortError") showSpeakError(e.name === "TimeoutError" ? msg("err_speak_timeout") : (e.msg || raw(e.message)));
   } finally {
-    if (speakAbort === abort) { speakAbort = null; button.disabled = false; button.textContent = "Speak"; }
+    if (speakAbort === abort) { speakAbort = null; speaking = false; $("speak").disabled = false; renderSpeakButton(); }
   }
 }
 $("speak").addEventListener("click", speak);
@@ -484,6 +749,8 @@ for (const sentence of SAMPLES) {
   $("chips").appendChild(chip);
 }
 
+applyLanguage();
+applySize();
 loadHealth();
 </script>
 </body>

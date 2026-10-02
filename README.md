@@ -284,17 +284,22 @@ The server defends against a web page reaching it under another name (DNS rebind
   <img src="docs/images/test-ui-desktop.png" width="720" alt="The voxar test page: a Listen panel with an Arabic transcript, and a Speak panel with sample sentences and an audio player"/>
 </p>
 
+**Everywhere**
+- **English or العربية.** The button at the top switches the whole page, including right-to-left layout, and the choice is remembered.
+- **Theme and text size.** *Theme* cycles auto, light and dark; **A-** and **A+** resize the transcript. Both are remembered.
+- **First-run help.** If the speech-to-text engine or the voice is not installed, the page shows the exact commands to run, each with a copy button, instead of a bare error.
+
 **Listen**
 - **Drop an audio file** (any format your browser can play) and it is transcribed in seconds, for example a 5.7 s clip in 0.34 s.
 - Tick *Play the file as live* to stream it to `WS /v1/stream` at the speed of speech: partial text appears while it plays (grey text is still being revised, black lines are final), with a level meter, a timer and "First text after 1.1 s". Press **Space** to start or stop.
-- Results from live, files and repeated drops collect on one stage, with **Copy text** and **Clear**.
+- Results from live, files and repeated drops collect on one stage, with **Copy text**, **Save text** (a `.txt` file that opens correctly in Windows Notepad) and **Clear**. **Esc** also stops a live session.
 
 <p align="center">
   <img src="docs/images/test-ui-live.png" width="720" alt="Live mode mid-stream: red Stop button with a pulsing dot, level meter, timer 0:12, one final black line and one grey line still changing"/>
 </p>
 
 **Speak**
-- Type Arabic (without full diacritics) and press **Speak** or **Ctrl/Cmd + Enter**, or click one of three **sample sentences** to speak it in one click. The audio plays and has a **Download WAV** link.
+- Type Arabic (without full diacritics) and press **Speak** or **Ctrl/Cmd + Enter**, or click one of three **sample sentences** to speak it in one click. The audio plays and has a **Download WAV** link, and earlier clips stay below it so you can replay them, reuse their text or download them.
 
 <details><summary>Phone and dark mode</summary>
 
