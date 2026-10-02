@@ -41,6 +41,10 @@ class DownloadError(VoxarError):
     """A network download failed."""
 
 
+class LLMError(VoxarError):
+    """A language-model request failed or returned something unusable."""
+
+
 def _check_pcm16(pcm: bytes, channels: int) -> None:
     frame = _BYTES_PER_SAMPLE * channels
     if len(pcm) % frame:

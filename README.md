@@ -24,11 +24,11 @@
   <img src="https://img.shields.io/badge/status-pre--alpha-orange" alt="Status: pre-alpha"/>
 </p>
 
-> **Pre-alpha.** Speed, memory and server load were measured on one machine: see [Performance](#performance-measured-on-one-machine) and [What has been checked](#what-has-been-checked).
+> **Pre-alpha.** Speed, memory and server load were measured on one machine: see [Performance](#performance-measured-on-one-machine).
 
-Run `voxar transcribe` on an audio file and Arabic speech becomes text on your own machine. Run `voxar say` and Saudi-dialect text becomes speech. Point an AI agent at `voxar mcp` and it can do both.
+Run `voxar transcribe` on an audio file and Arabic speech becomes text on your own machine. Run `voxar say` and Saudi-dialect text becomes speech. Point an AI agent at `voxar mcp` and it can do both, and `voxar llm` talks to the language model for a spoken conversation.
 
-- **On-device and private.** Models run locally. No audio is sent anywhere, and there is no telemetry. The only network use is the explicit `voxar models pull` download.
+- **On-device and private.** The speech models run locally. No audio is sent anywhere, and there is no telemetry. The network is used only for the explicit `voxar models pull` download and, if you run `voxar llm`, for the text you send to the language-model provider you choose (a local one such as Ollama keeps it on your machine).
 - **Every model is verified.** Downloads are HTTPS-only, and every file is checked against a pinned SHA-256 before it is used. A bad or interrupted download never looks installed.
 - **Small and dependency-free core.** The Apache-2.0 core has no runtime dependencies. Engines, the MCP server and the HTTP server are optional extras, and text-to-speech is a separate GPL-3.0 plugin on purpose (see [Licensing](#licensing)).
 
@@ -110,28 +110,16 @@ error: audio must be mono (got 2 channels); convert with: ffmpeg -i INPUT -ar 16
 
 ## What it does
 
-| Capability | What you get | Status |
-|---|---|---|
-| **Speech-to-text from a file** | `voxar transcribe` returns the final text | Works (Moonshine streaming Arabic) |
-| **Saudi-dialect text-to-speech** | `voxar say` writes a 24 kHz WAV, one female voice | Works via an optional **GPL-3.0** plugin that needs torch |
-| **MCP server for agents** | `transcribe_file`, `speak`, `list_engines` over stdio; file access confined to allowed directories | Works |
-| **Local HTTP/WebSocket server** | `POST /v1/transcribe`, `POST /v1/speak`, live `WS /v1/stream` | Works |
-| **Browser test page** | `voxar serve` serves a page at `/` to upload audio, stream it live, and type text to hear it | Works |
-| **Verified model downloads** | `voxar models pull/verify`: HTTPS only, pinned SHA-256, atomic install | Works |
-| **Engines as plugins** | Add an engine by registering an entry point; the core never imports it | Works (Moonshine and the Saudi voice use it) |
-
----
-
-## What has been checked
-
-| Area | Checked how |
+| Capability | What you get |
 |---|---|
-| Core, CLI, servers | Unit tests (98% line coverage), `ruff`, `mypy --strict`, `pip-audit` |
-| Speech-to-text | Real model on 14 synthetic clips; speed and memory measured; contract tests; 1 + 4 concurrent streams on one loaded model gave identical results |
-| Text-to-speech | Real model; speed and memory measured; Saudi sentences read back by the speech-to-text engine |
-| MCP and HTTP servers | Real stdio client, real HTTP and WebSocket clients, spoofed `Host` (403), foreign `Origin` refused; load-tested with 1 to 32 clients and 1 to 8 live streams |
-| Browser test page | 16-check script in headless Edge against the real server (see [A page to test it in your browser](#a-page-to-test-it-in-your-browser)) |
-| Install | Clean-environment install from the project folder, then every command in this README run against the real models |
+| **Speech-to-text from a file** | `voxar transcribe` returns the final text (Moonshine streaming Arabic) |
+| **Saudi-dialect text-to-speech** | `voxar say` writes a 24 kHz WAV, one female voice, through an optional **GPL-3.0** plugin that needs torch |
+| **MCP server for agents** | `transcribe_file`, `speak`, `list_engines` over stdio; file access confined to allowed directories. With `--voice`, also `announce`, `listen` and `ask`, so an agent such as Claude Code or Codex can speak a status update or hear you ([guide](docs/agents-mcp.md)) |
+| **Language models** | `voxar llm ask/models/providers`: HUMAIN Node (default), OpenRouter, OpenAI, Anthropic, Groq, Together, Mistral, Gemini, Ollama, LM Studio or any compatible server |
+| **Local HTTP/WebSocket server** | `POST /v1/transcribe`, `POST /v1/speak`, live `WS /v1/stream` |
+| **Browser test page** | `voxar serve` serves a page at `/` to upload audio, stream it live, and type text to hear it |
+| **Verified model downloads** | `voxar models pull/verify`: HTTPS only, pinned SHA-256, atomic install |
+| **Engines as plugins** | Add an engine by registering an entry point; the core never imports it |
 
 ---
 
@@ -162,7 +150,7 @@ Partial text can still change (note "السلام علي" being revised); a fina
 
 ## Performance (measured on one machine)
 
-Apple M4 laptop, 10 cores, 16 GB, CPU only. Your numbers will differ; the methodology, the experiments that shaped the code, and the scripts to reproduce everything are in [docs/performance.md](docs/performance.md).
+Apple M4 laptop, 10 cores, 16 GB, CPU only. Your numbers will differ; the methodology and the scripts to reproduce everything are in [docs/performance.md](docs/performance.md).
 
 | What | Result |
 |---|---|
@@ -250,6 +238,12 @@ uv run voxar mcp --allow-dir ./audio
 | `transcribe_file` | `path` | the transcript |
 | `speak` | `text`, `output_path`, optional `voice`, optional `overwrite` | where the WAV was written and its length |
 | `list_engines` | none | installed recognizers and synthesizers |
+| `announce` (`--voice`) | `message` | speaks a short status update on the speakers |
+| `listen` (`--voice`) | optional `max_seconds`, `silence_seconds` | what you said, as text |
+| `ask` (`--voice`) | `question` | speaks the question, then returns your spoken answer |
+| `check_voice_inbox` (`--voice`) | optional `wait_seconds` | what you said from another window with `voxar inbox listen` |
+
+The voice tools exist only when the server starts with `--voice`: `uv run voxar mcp --voice`. To give a running agent tasks by voice from a second window, run `uv run voxar inbox listen` there (press Enter, speak). Setup for Claude Code and Codex, the hooks, and the safety notes are in [docs/agents-mcp.md](docs/agents-mcp.md).
 
 An agent controls every argument, so file paths must resolve **inside an allowed directory** (default: the working directory; `..` and symlinks cannot escape), `speak` never overwrites a file unless `overwrite=true`, and only WAV audio is read.
 
@@ -284,23 +278,28 @@ The server defends against a web page reaching it under another name (DNS rebind
 
 ### A page to test it in your browser
 
-`voxar serve` also serves a test page at its address. Open **http://127.0.0.1:8765**. It has two panels, **Listen** and **Speak**, and both fit on one screen. Everything runs on your machine, and the layout and fonts follow the clean style of [nabrah.ai](https://www.nabrah.ai/) (Satoshi headings, Inter body, Instrument Serif title, Tajawal for Arabic; they load without blocking the page and fall back to system fonts offline).
+`voxar serve` also serves a test page at its address. Open **http://127.0.0.1:8765**. It has two panels, **Listen** and **Speak**, and both fit on one screen. Everything runs on your machine. The fonts (Satoshi, Inter, Instrument Serif, Tajawal) load without blocking the page and fall back to system fonts offline.
 
 <p align="center">
   <img src="docs/images/test-ui-desktop.png" width="720" alt="The voxar test page: a Listen panel with an Arabic transcript, and a Speak panel with sample sentences and an audio player"/>
 </p>
 
+**Everywhere**
+- **English or العربية.** The button at the top switches the whole page, including right-to-left layout, and the choice is remembered.
+- **Theme and text size.** *Theme* cycles auto, light and dark; **A-** and **A+** resize the transcript. Both are remembered.
+- **First-run help.** If the speech-to-text engine or the voice is not installed, the page shows the exact commands to run, each with a copy button, instead of a bare error.
+
 **Listen**
 - **Drop an audio file** (any format your browser can play) and it is transcribed in seconds, for example a 5.7 s clip in 0.34 s.
 - Tick *Play the file as live* to stream it to `WS /v1/stream` at the speed of speech: partial text appears while it plays (grey text is still being revised, black lines are final), with a level meter, a timer and "First text after 1.1 s". Press **Space** to start or stop.
-- Results from live, files and repeated drops collect on one stage, with **Copy text** and **Clear**.
+- Results from live, files and repeated drops collect on one stage, with **Copy text**, **Save text** (a `.txt` file that opens correctly in Windows Notepad) and **Clear**. **Esc** also stops a live session.
 
 <p align="center">
   <img src="docs/images/test-ui-live.png" width="720" alt="Live mode mid-stream: red Stop button with a pulsing dot, level meter, timer 0:12, one final black line and one grey line still changing"/>
 </p>
 
 **Speak**
-- Type Arabic (without full diacritics) and press **Speak** or **Ctrl/Cmd + Enter**, or click one of three **sample sentences** to speak it in one click. The audio plays and has a **Download WAV** link.
+- Type Arabic (without full diacritics) and press **Speak** or **Ctrl/Cmd + Enter**, or click one of three **sample sentences** to speak it in one click. The audio plays and has a **Download WAV** link, and earlier clips stay below it so you can replay them, reuse their text or download them.
 
 <details><summary>Phone and dark mode</summary>
 
@@ -311,14 +310,9 @@ The server defends against a web page reaching it under another name (DNS rebind
 
 </details>
 
-**Faster by measurement** (Apple M4, headless Edge, 5 loads each):
-- The page paints in **56 ms** (median first contentful paint), down from 548 ms in the previous version, because the web-font stylesheets no longer block rendering.
-- `voxar serve` now loads the engines in the background at start-up, so the first click is fast: the first Speak request took **0.14 to 0.20 s** after start-up instead of about **3.0 s** when loaded on first use (3 fresh starts each). The cost is memory (about 300 MB resident instead of about 30 MB until first use); pass `--no-warm` to load on first use instead.
-- A newer Speak request cancels an older one still in flight, and the page never waits forever (requests time out with a clear message).
+**Start-up.** `voxar serve` loads the engines in the background at start-up so the first click is fast (about 300 MB resident instead of about 30 MB until first use); pass `--no-warm` to load on first use instead. A newer Speak request cancels an older one still in flight, and the page never waits forever (requests time out with a clear message).
 
 The screenshots show real results (the sentence "الاجتماع غدا الساعة العاشرة صباحا في مكتب أرياض" transcribed from a synthetic voice). The browser converts any audio it can play to 16 kHz mono before sending it, so you do not need `ffmpeg` for this page.
-
-**Tested:** a 16-check script drove the page in headless Edge against the real server (file drop, appending a second file, Clear, live from a file with the level meter and timer, Stop, keyboard shortcuts, sample chips, Ctrl+Enter, the empty-text message): 16 of 16 passed.
 
 ---
 
@@ -333,6 +327,8 @@ uv run voxar models pull moonshine-tiny-streaming-ar --accept-license
 uv run voxar models verify moonshine-tiny-streaming-ar
 uv run voxar mcp --allow-dir ./audio                  # MCP server on stdio
 uv run voxar serve --port 8765                        # local HTTP/WebSocket server
+uv run voxar llm providers                            # language-model providers and key status
+uv run voxar llm ask "مرحبا" --model MODEL_ID          # one message to a language model
 ```
 
 Convert any audio first with `ffmpeg -i input.m4a -ar 16000 -ac 1 -sample_fmt s16 sample.wav`.
@@ -370,15 +366,20 @@ These are the only configuration. There are no config files.
 | `VOXAR_OFFLINE` | `1`/`true`/`yes`/`on` forbids any download | off |
 | `VOXAR_RECOGNIZER` | Speech-to-text engine name | `moonshine` |
 | `VOXAR_SYNTHESIZER` | Text-to-speech engine name | none (set `nabra-saudi` with the plugin) |
+| `VOXAR_LLM_PROVIDER` | Language-model provider ([list](docs/llm.md)) | `humain` |
+| `VOXAR_LLM_MODEL` | Language-model id | the provider's default, if any |
+| `VOXAR_LLM_BASE_URL` | Replace the provider's URL (https, or localhost) | the provider's URL |
+
+API keys are read from the provider's own variable (for example `HUMAIN_NODE_API_KEY`), never from a file.
 
 ---
 
 ## Privacy
 
 - **No telemetry**, no analytics, no phoning home.
-- **Audio never leaves your machine.** Recognition and synthesis run locally. The only network use is `voxar models pull`, which downloads model files over HTTPS from the model's publisher and verifies them.
-- Set `VOXAR_OFFLINE=1` to make any download impossible.
-- The MCP server runs over stdio (no network). The HTTP server listens on loopback only unless you pass `--allow-remote`.
+- **Audio never leaves your machine.** Recognition and synthesis run locally. The network is used by `voxar models pull`, which downloads model files over HTTPS from the model's publisher and verifies them, and by `voxar llm`, which sends **only the text you give it** to the provider you pick. Local providers (`ollama`, `lmstudio`) keep even that on your machine.
+- Set `VOXAR_OFFLINE=1` to make any download impossible and to block remote language-model providers.
+- The MCP server runs over stdio (no network). Its voice tools (`--voice`) use the microphone only while an agent's `listen` or `ask` call runs, and return text only. The HTTP server listens on loopback only unless you pass `--allow-remote`.
 - Audio can contain personal data. Do not attach recordings to bug reports.
 
 ---
@@ -414,16 +415,25 @@ Run it through uv from the project folder: `uv run voxar ...`.
 ## Full command reference
 
 ```
-voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,doctor} ...
+voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,llm,inbox,doctor} ...
 
 voxar transcribe sample.wav                    # FILE: 16 kHz mono 16-bit WAV
-voxar say "text" -o out.wav --voice af_msa     # -o is required; --voice is engine-specific
+voxar say "text" -o out.wav --voice af_msa     # --voice is engine-specific
+voxar say "text"                               # no -o: play on the speakers
 voxar models list
 voxar models pull moonshine-tiny-streaming-ar --accept-license
 voxar models verify moonshine-tiny-streaming-ar
 voxar mcp --allow-dir ./audio --allow-dir ./recordings   # repeat --allow-dir; default is the working directory
+voxar mcp --voice                              # let the agent speak and listen
+voxar inbox listen                             # speak to a running agent (press Enter, then talk)
+voxar inbox listen --always-on --wake WORD     # hands-free, only phrases containing WORD
+voxar inbox read                               # print and consume the spoken messages
+voxar inbox clear
 voxar serve --host 127.0.0.1 --port 8765
 voxar serve --host 0.0.0.0 --allow-remote      # no authentication: trusted networks only
+voxar llm providers
+voxar llm models --provider openrouter
+voxar llm ask "text" --provider humain --model MODEL_ID --system "..." --max-tokens 400 --no-stream
 voxar doctor
 voxar --version
 ```
@@ -434,10 +444,10 @@ Exit codes: `0` success, `2` any error (a single `error: ...` line on stderr).
 
 ## Learn more
 
-- [docs/](docs/index.md): quickstart, command line, Python API, MCP, local server, text-to-speech plugin.
+- [docs/](docs/index.md): quickstart, command line, Python API, MCP, local server, text-to-speech plugin, language models.
 - [ARCHITECTURE.md](ARCHITECTURE.md): ports and adapters, module rules, how to add an engine.
 - [Decisions](docs/adr/0001-ports-and-adapters.md) and the [threat model](docs/THREAT_MODEL.md).
-- [docs/performance.md](docs/performance.md): measured speed, memory, load and the experiments behind the design.
+- [docs/performance.md](docs/performance.md): measured speed, memory and load.
 - [examples/](examples/README.md): eight runnable scripts with real output.
 - [CHANGELOG](CHANGELOG.md).
 
@@ -458,4 +468,4 @@ Read these before any commercial use:
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and the rules (license tracking, claims backed by a measurement, tests for every change), [AGENTS.md](AGENTS.md) for coding agents, and [SUPPORT.md](SUPPORT.md) for bug reports. Security issues: [SECURITY.md](SECURITY.md).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and the rules (license tracking, claims backed by a measurement, tests for every change), and [SUPPORT.md](SUPPORT.md) for bug reports. Security issues: [SECURITY.md](SECURITY.md).

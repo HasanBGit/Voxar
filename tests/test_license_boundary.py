@@ -9,7 +9,7 @@ FORBIDDEN = {"voxar_tts_espeak", "phonemizer", "espeakng_loader", "misaki", "tor
 
 def imported_top_level_names(path: Path) -> set[str]:
     names: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text())):
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if isinstance(node, ast.Import):
             names.update(alias.name.split(".")[0] for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:

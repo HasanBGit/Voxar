@@ -220,9 +220,10 @@ def test_models_list_includes_the_real_moonshine_model(tmp_path: Path) -> None:
 def test_mcp_command_serves_with_allowed_dirs(tmp_path: Path) -> None:
     seen: dict[str, Any] = {}
 
-    def fake_serve(app: Any, allowed: Any, engines: Any) -> None:
+    def fake_serve(app: Any, allowed: Any, engines: Any, voice: bool, inbox_dir: Path) -> None:
         seen["allowed"] = list(allowed)
         seen["engines"] = engines()
+        seen["voice"] = voice
 
     code, _, _ = run_with(
         ["mcp", "--allow-dir", str(tmp_path / "a"), "--allow-dir", str(tmp_path / "b")],
@@ -232,6 +233,7 @@ def test_mcp_command_serves_with_allowed_dirs(tmp_path: Path) -> None:
     assert code == 0
     assert seen["allowed"] == [tmp_path / "a", tmp_path / "b"]
     assert "moonshine" in seen["engines"]["recognizers"]
+    assert seen["voice"] is False  # the microphone and speakers are opt-in
 
 
 def test_mcp_command_defaults_to_the_working_directory(tmp_path: Path) -> None:
@@ -239,10 +241,42 @@ def test_mcp_command_defaults_to_the_working_directory(tmp_path: Path) -> None:
     code, _, _ = run_with(
         ["mcp"],
         tmp_path,
-        serve_mcp=lambda app, allowed, engines: seen.update(allowed=list(allowed)),
+        serve_mcp=lambda app, allowed, engines, voice, inbox_dir: seen.update(
+            allowed=list(allowed)
+        ),
     )
     assert code == 0
     assert seen["allowed"] == [Path.cwd()]
+
+
+def test_mcp_voice_flag_enables_the_voice_tools(tmp_path: Path) -> None:
+    seen: dict[str, Any] = {}
+    code, _, _ = run_with(
+        ["mcp", "--voice"],
+        tmp_path,
+        serve_mcp=lambda app, allowed, engines, voice, inbox_dir: seen.update(
+            voice=voice, inbox_dir=inbox_dir
+        ),
+    )
+    assert code == 0
+    assert seen == {"voice": True, "inbox_dir": tmp_path / ".cache" / "voxar" / "inbox"}
+
+
+def test_say_without_an_output_file_plays_on_the_speakers(tmp_path: Path) -> None:
+    played: list[Any] = []
+    out, err = io.StringIO(), io.StringIO()
+    code = main(
+        ["say", "abc"],
+        env={"HOME": str(tmp_path), "VOXAR_SYNTHESIZER": "fake"},
+        registry=registry(),
+        play=played.append,
+        stdout=out,
+        stderr=err,
+    )
+    assert code == 0
+    assert len(played) == 1
+    assert len(played[0].pcm) == 160 * 3 * 2  # FakeSynthesizer: 160 samples per character
+    assert out.getvalue() == ""
 
 
 def test_mcp_command_without_the_extra_gives_an_install_hint(
@@ -326,3 +360,104 @@ def test_no_warm_flag_is_passed_to_the_server(tmp_path: Path) -> None:
     )
     assert code == 0
     assert seen == {"warm": False}
+
+
+# --- voxar inbox: spoken messages for a running agent ---
+
+
+def _speech_chunks() -> "Iterator[AudioChunk]":
+    import struct
+
+    loud = AudioChunk(pcm=struct.pack("<h", 3000) * 1600)
+    quiet = AudioChunk(pcm=bytes(3200))
+    yield from [loud] * 3 + [quiet] * 20
+
+
+def _inbox_run(
+    argv: list[str], tmp_path: Path, stdin: str = "", **kwargs: Any
+) -> tuple[int, str, str]:
+    out, err = io.StringIO(), io.StringIO()
+    code = main(
+        argv,
+        env={"HOME": str(tmp_path)},
+        registry=registry(),
+        stdin=io.StringIO(stdin),
+        stdout=out,
+        stderr=err,
+        **kwargs,
+    )
+    return code, out.getvalue(), err.getvalue()
+
+
+def _messages(tmp_path: Path) -> list[str]:
+    from voxar.inbox import Inbox
+
+    return [m.text for m in Inbox(tmp_path / ".cache" / "voxar" / "inbox").take()]
+
+
+def test_inbox_listen_waits_for_enter_and_stores_what_was_said(tmp_path: Path) -> None:
+    code, out, err = _inbox_run(
+        ["inbox", "listen", "--once", "--silence", "0.5"], tmp_path, stdin="\n", mic=_speech_chunks
+    )
+    assert code == 0
+    assert out.startswith("heard: line0:")
+    assert "press Enter" in err
+    assert len(_messages(tmp_path)) == 1
+
+
+def test_inbox_listen_stops_when_the_input_ends(tmp_path: Path) -> None:
+    code, out, _ = _inbox_run(["inbox", "listen"], tmp_path, stdin="", mic=_speech_chunks)
+    assert (code, out) == (0, "")
+    assert _messages(tmp_path) == []
+
+
+def test_always_on_warns_that_everything_it_hears_counts(tmp_path: Path) -> None:
+    code, _, err = _inbox_run(
+        ["inbox", "listen", "--always-on", "--once", "--silence", "0.5"],
+        tmp_path,
+        mic=_speech_chunks,
+    )
+    assert code == 0
+    assert "everything the microphone hears" in err
+    assert "--wake" in err
+    assert len(_messages(tmp_path)) == 1
+
+
+def test_a_wake_word_filters_phrases_that_lack_it(tmp_path: Path) -> None:
+    code, out, _ = _inbox_run(
+        ["inbox", "listen", "--wake", "فوكسار", "--silence", "0.5"],
+        tmp_path,
+        stdin="\n",
+        mic=_speech_chunks,
+    )
+    assert (code, out) == (0, "")  # FakeRecognizer never says the wake word
+    assert _messages(tmp_path) == []
+
+
+def test_inbox_read_prints_each_message_once(tmp_path: Path) -> None:
+    from voxar.inbox import Inbox
+
+    Inbox(tmp_path / ".cache" / "voxar" / "inbox").add("اعمل الاختبارات")
+    assert _inbox_run(["inbox", "read"], tmp_path)[1] == "اعمل الاختبارات\n"
+    assert _inbox_run(["inbox", "read"], tmp_path)[1] == ""
+
+
+def test_inbox_read_hook_blocks_the_stop_with_the_message_as_the_reason(tmp_path: Path) -> None:
+    import json
+
+    from voxar.inbox import Inbox
+
+    Inbox(tmp_path / ".cache" / "voxar" / "inbox").add("اعمل الاختبارات")
+    _, out, _ = _inbox_run(["inbox", "read", "--hook"], tmp_path)
+    decision = json.loads(out)
+    assert decision["decision"] == "block"
+    assert "اعمل الاختبارات" in decision["reason"]
+    assert _inbox_run(["inbox", "read", "--hook"], tmp_path)[1] == ""  # nothing left: no output
+
+
+def test_inbox_clear_deletes_messages(tmp_path: Path) -> None:
+    from voxar.inbox import Inbox
+
+    Inbox(tmp_path / ".cache" / "voxar" / "inbox").add("x")
+    assert _inbox_run(["inbox", "clear"], tmp_path)[0] == 0
+    assert _messages(tmp_path) == []

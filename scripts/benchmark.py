@@ -15,13 +15,17 @@ import json
 import os
 import platform
 import re
-import resource
 import statistics
 import sys
 import time
 import wave
 from collections.abc import Sequence
 from pathlib import Path
+
+try:
+    import resource  # Unix only
+except ImportError:  # Windows
+    resource = None  # type: ignore[assignment]
 
 from voxar import Config, Voxar
 from voxar.audio import write_wav
@@ -61,9 +65,12 @@ def percentile(values: Sequence[float], p: float) -> float:
     return ordered[min(len(ordered) - 1, round(p / 100 * (len(ordered) - 1)))]
 
 
-def peak_rss_mb() -> float:
+def peak_memory() -> str:
+    if resource is None:
+        return "n/a on this platform"
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    return peak / (1024 * 1024) if sys.platform == "darwin" else peak / 1024
+    megabytes = peak / (1024 * 1024) if sys.platform == "darwin" else peak / 1024
+    return f"{megabytes:.0f} MB"
 
 
 def duration_s(path: Path) -> float:
@@ -110,7 +117,7 @@ def bench_asr(clips: list[Path], refs: dict[str, str], repeat: int) -> None:
             f"error rates (n={len(wers)} clips): "
             f"mean WER {statistics.mean(wers):.1f} %, mean CER {statistics.mean(cers):.1f} %"
         )
-    print(f"peak memory: {peak_rss_mb():.0f} MB   (first result: {first[:40]!r})")
+    print(f"peak memory: {peak_memory()}   (first result: {first[:40]!r})")
 
 
 def bench_tts(texts: list[str], repeat: int) -> None:
@@ -134,7 +141,7 @@ def bench_tts(texts: list[str], repeat: int) -> None:
         f"\nwarm RTF: mean {statistics.mean(rtfs):.3f}, median {statistics.median(rtfs):.3f}, "
         f"p95 {percentile(rtfs, 95):.3f} over {len(rtfs)} runs"
     )
-    print(f"peak memory: {peak_rss_mb():.0f} MB")
+    print(f"peak memory: {peak_memory()}")
     if os.environ.get("BENCH_SAVE"):
         write_wav(os.environ["BENCH_SAVE"], audio)
 
@@ -153,7 +160,7 @@ def main(argv: list[str]) -> int:
     tts.add_argument("--repeat", type=int, default=1)
     args = parser.parse_args(argv)
     if args.kind == "asr":
-        refs = json.loads(args.refs.read_text()) if args.refs else {}
+        refs = json.loads(args.refs.read_text(encoding="utf-8")) if args.refs else {}
         bench_asr(args.clips, refs, args.repeat)
     else:
         bench_tts(args.texts, args.repeat)

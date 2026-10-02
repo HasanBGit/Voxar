@@ -16,6 +16,9 @@ class Config:
     offline: bool = False
     recognizer: str = "moonshine"
     synthesizer: str | None = None
+    llm_provider: str | None = None
+    llm_model: str | None = None
+    llm_base_url: str | None = None
 
     def __post_init__(self) -> None:
         if not self.recognizer:
@@ -30,6 +33,9 @@ class Config:
             offline=_parse_bool("VOXAR_OFFLINE", env.get("VOXAR_OFFLINE", "")),
             recognizer=env.get("VOXAR_RECOGNIZER", "moonshine"),
             synthesizer=env.get("VOXAR_SYNTHESIZER") or None,
+            llm_provider=env.get("VOXAR_LLM_PROVIDER") or None,
+            llm_model=env.get("VOXAR_LLM_MODEL") or None,
+            llm_base_url=env.get("VOXAR_LLM_BASE_URL") or None,
         )
 
 

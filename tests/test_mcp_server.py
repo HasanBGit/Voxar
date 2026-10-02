@@ -1,4 +1,6 @@
 import asyncio
+import struct
+import threading
 import wave
 from pathlib import Path
 from typing import Any
@@ -8,7 +10,9 @@ import pytest
 from tests.fakes import FakeRecognizer, FakeSynthesizer
 from tests.test_audio import make_wav
 from voxar import Voxar
+from voxar.domain import AudioChunk
 from voxar.mcp_server import build_server, resolve_inside
+from voxar.voice import VoiceIO
 
 pytest.importorskip("mcp")
 from mcp import Client  # noqa: E402
@@ -114,3 +118,184 @@ def test_list_engines(tmp_path: Path) -> None:
     result = call(server(tmp_path), "list_engines", {})
     assert not result.is_error
     assert "fake" in str(result.structured_content)
+
+
+# --- voice tools (--voice): speakers and microphone, injected so no device is needed ---
+
+
+class FakeDevices:
+    def __init__(self, phrases: list[list[AudioChunk]] | None = None) -> None:
+        self.played: list[Any] = []
+        self.opened = 0
+        self._phrases = list(phrases or [])
+
+    def play(self, audio: Any) -> None:
+        self.played.append(audio)
+
+    def listen_chunks(self) -> Any:
+        self.opened += 1
+        return iter(self._phrases.pop(0) if self._phrases else [])
+
+
+def speech(blocks: int = 3) -> list[AudioChunk]:
+    loud = AudioChunk(pcm=struct.pack("<h", 3000) * 1600)
+    quiet = AudioChunk(pcm=bytes(3200))
+    return [loud] * blocks + [quiet] * 20
+
+
+def voice_server(tmp_path: Path, devices: FakeDevices) -> Any:
+    app = Voxar(recognizer=FakeRecognizer(), synthesizer=FakeSynthesizer(), chunk_ms=250)
+    return build_server(
+        app,
+        allowed_dirs=[tmp_path],
+        engines=lambda: {"recognizers": ["fake"], "synthesizers": ["fake"]},
+        voice=VoiceIO(play=devices.play, listen_chunks=devices.listen_chunks),
+    )
+
+
+def test_voice_tools_exist_only_with_the_voice_option(tmp_path: Path) -> None:
+    async def names(srv: Any) -> set[str]:
+        async with Client(srv) as client:
+            return {tool.name for tool in (await client.list_tools()).tools}
+
+    assert asyncio.run(names(voice_server(tmp_path, FakeDevices()))) == {
+        "transcribe_file",
+        "speak",
+        "list_engines",
+        "announce",
+        "listen",
+        "ask",
+    }
+    assert "announce" not in asyncio.run(names(server(tmp_path)))
+
+
+def test_announce_speaks_on_the_speakers_and_writes_no_file(tmp_path: Path) -> None:
+    devices = FakeDevices()
+    result = call(voice_server(tmp_path, devices), "announce", {"message": "خلصت"})
+    assert not result.is_error
+    assert len(devices.played) == 1
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("message", ["", "   ", "x" * 501])
+def test_announce_rejects_empty_and_long_messages(tmp_path: Path, message: str) -> None:
+    devices = FakeDevices()
+    result = call(voice_server(tmp_path, devices), "announce", {"message": message})
+    assert result.is_error
+    assert devices.played == []
+
+
+def test_listen_returns_the_transcript_of_one_phrase(tmp_path: Path) -> None:
+    devices = FakeDevices([speech()])
+    result = call(voice_server(tmp_path, devices), "listen", {"silence_seconds": 0.5})
+    assert not result.is_error
+    assert "line0:" in str(result.structured_content)  # FakeRecognizer's final line
+    assert devices.opened == 1
+
+
+def test_listen_reports_silence_as_a_result_not_an_error(tmp_path: Path) -> None:
+    devices = FakeDevices([[AudioChunk(pcm=bytes(3200))] * 200])
+    result = call(voice_server(tmp_path, devices), "listen", {"max_seconds": 1.0})
+    assert not result.is_error
+    assert "no speech heard" in str(result.structured_content)
+
+
+@pytest.mark.parametrize(
+    "arguments", [{"max_seconds": 0.1}, {"max_seconds": 61}, {"silence_seconds": 9}]
+)
+def test_listen_rejects_out_of_range_durations_without_opening_the_microphone(
+    tmp_path: Path, arguments: dict[str, float]
+) -> None:
+    devices = FakeDevices([speech()])
+    result = call(voice_server(tmp_path, devices), "listen", arguments)
+    assert result.is_error
+    assert devices.opened == 0
+
+
+def test_ask_speaks_the_question_before_it_listens(tmp_path: Path) -> None:
+    order: list[str] = []
+
+    class Ordered(FakeDevices):
+        def play(self, audio: Any) -> None:
+            order.append("play")
+            super().play(audio)
+
+        def listen_chunks(self) -> Any:
+            order.append("listen")
+            return super().listen_chunks()
+
+    devices = Ordered([speech()])
+    result = call(
+        voice_server(tmp_path, devices), "ask", {"question": "أكمل؟", "silence_seconds": 0.5}
+    )
+    assert not result.is_error
+    assert order == ["play", "listen"]
+
+
+def test_a_failed_question_never_opens_the_microphone(tmp_path: Path) -> None:
+    devices = FakeDevices([speech()])
+    result = call(voice_server(tmp_path, devices), "ask", {"question": " "})
+    assert result.is_error
+    assert devices.opened == 0
+
+
+def test_server_instructions_tell_agents_how_to_use_the_voice(tmp_path: Path) -> None:
+    async def instructions(srv: Any) -> str:
+        async with Client(srv) as client:
+            return client.instructions or ""
+
+    text = asyncio.run(instructions(voice_server(tmp_path, FakeDevices())))
+    assert "announce" in text
+    assert "Arabic" in text
+    assert "announce" not in asyncio.run(instructions(server(tmp_path)))
+
+
+# --- check_voice_inbox: spoken messages sent from another window ---
+
+
+def inbox_server(tmp_path: Path) -> tuple[Any, Any]:
+    from voxar.inbox import Inbox
+
+    inbox = Inbox(tmp_path / "inbox")
+    app = Voxar(recognizer=FakeRecognizer(), synthesizer=FakeSynthesizer(), chunk_ms=250)
+    devices = FakeDevices()
+    srv = build_server(
+        app,
+        allowed_dirs=[tmp_path],
+        engines=lambda: {"recognizers": [], "synthesizers": []},
+        voice=VoiceIO(play=devices.play, listen_chunks=devices.listen_chunks),
+        inbox=inbox,
+    )
+    return srv, inbox
+
+
+def test_check_voice_inbox_returns_each_message_once(tmp_path: Path) -> None:
+    srv, inbox = inbox_server(tmp_path)
+    inbox.add("كمّل على الخطة")
+    first = call(srv, "check_voice_inbox", {})
+    assert not first.is_error
+    assert "كمّل على الخطة" in str(first.structured_content)
+    assert "no new voice messages" in str(call(srv, "check_voice_inbox", {}).structured_content)
+
+
+def test_check_voice_inbox_can_wait_for_a_message(tmp_path: Path) -> None:
+    srv, inbox = inbox_server(tmp_path)
+    timer = threading.Timer(0.3, inbox.add, args=("وصلت متأخرة",))
+    timer.start()
+    result = call(srv, "check_voice_inbox", {"wait_seconds": 5})
+    timer.join()
+    assert "وصلت متأخرة" in str(result.structured_content)
+
+
+def test_check_voice_inbox_rejects_a_wait_over_a_minute(tmp_path: Path) -> None:
+    assert call(inbox_server(tmp_path)[0], "check_voice_inbox", {"wait_seconds": 61}).is_error
+
+
+def test_the_inbox_tool_needs_the_voice_option(tmp_path: Path) -> None:
+    async def names(srv: Any) -> set[str]:
+        async with Client(srv) as client:
+            return {tool.name for tool in (await client.list_tools()).tools}
+
+    assert "check_voice_inbox" in asyncio.run(names(inbox_server(tmp_path)[0]))
+    assert "check_voice_inbox" not in asyncio.run(names(voice_server(tmp_path, FakeDevices())))
+    assert "check_voice_inbox" not in asyncio.run(names(server(tmp_path)))

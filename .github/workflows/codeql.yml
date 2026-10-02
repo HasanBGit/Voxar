@@ -13,6 +13,7 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     permissions:
+      actions: read          # CodeQL reads the workflow run (needed in private repositories)
       contents: read
       security-events: write
     steps:
@@ -23,3 +24,9 @@ jobs:
         with:
           languages: python
       - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          # GitHub rejects the upload ("Code scanning is not enabled for this repository") until
+          # Settings > Code security > Code scanning is on (and Advanced Security, on a private
+          # repository). Until the repository variable CODE_SCANNING is 'true' the queries still
+          # run, but the results are not uploaded.
+          upload: ${{ vars.CODE_SCANNING == 'true' && 'always' || 'never' }}

@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 import threading
@@ -317,6 +318,61 @@ def test_the_pages_javascript_is_syntactically_valid() -> None:
         input=script,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
+
+
+# --- the page's interface text: English and Arabic must stay in step ---
+
+
+def _page_strings() -> dict[str, dict[str, str]]:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    script = make_client().get("/").text.split("<script>")[1].split("</script>")[0]
+    literal = script.split("const STRINGS = ")[1].split("\nlet lang")[0].rstrip().rstrip(";")
+    program = f"console.log(JSON.stringify({literal}))"
+    result = subprocess.run(  # noqa: S603 - fixed arguments, a literal taken from our own page
+        [node, "-e", program], capture_output=True, text=True, encoding="utf-8", timeout=30
+    )
+    assert result.returncode == 0, result.stderr
+    strings: dict[str, dict[str, str]] = json.loads(result.stdout)
+    return strings
+
+
+def test_every_english_string_has_an_arabic_translation_and_the_reverse() -> None:
+    strings = _page_strings()
+    assert set(strings) == {"en", "ar"}
+    assert set(strings["en"]) - set(strings["ar"]) == set()
+    assert set(strings["ar"]) - set(strings["en"]) == set()
+
+
+def test_translations_keep_the_same_placeholders() -> None:
+    strings = _page_strings()
+    for key, english in strings["en"].items():
+        assert re.findall(r"\{\w+\}", english) == re.findall(r"\{\w+\}", strings["ar"][key]), key
+
+
+def test_every_string_the_page_asks_for_exists() -> None:
+    html = make_client().get("/").text
+    english = _page_strings()["en"]
+    used = set(re.findall(r'data-i18n(?:-aria|-placeholder)?="(\w+)"', html))
+    used |= set(re.findall(r'\b(?:t|msg)\("(\w+)"', html))
+    used |= set(re.findall(r'\["(step_\w+|setup_\w+)"', html))
+    used = {key for key in used if not key.endswith("_")}  # t("theme_" + name) is checked below
+    used |= {f"theme_{name}" for name in ("auto", "light", "dark")}
+    assert used - set(english) == set()
+
+
+def test_the_page_can_switch_language_and_theme() -> None:
+    html = make_client().get("/").text
+    for expected in (
+        'id="lang"',
+        'id="theme"',
+        'data-theme="dark"',
+        'dir = lang === "ar"',
+        'prefs.set("lang"',
+    ):
+        assert expected in html

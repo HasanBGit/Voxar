@@ -22,7 +22,7 @@ def test_logo_is_well_formed_svg_with_a_title_and_label(name: str) -> None:
 
 @pytest.mark.parametrize("name", NAMES)
 def test_logo_has_no_external_references_or_scripts(name: str) -> None:
-    text = (ASSETS / name).read_text().lower()
+    text = (ASSETS / name).read_text(encoding="utf-8").lower()
     for forbidden in (
         "<script",
         "href=",
@@ -41,5 +41,6 @@ def test_logo_files_match_the_generator() -> None:
         [sys.executable, str(ROOT / "scripts" / "make_logos.py"), "--check"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
     assert result.returncode == 0, result.stderr

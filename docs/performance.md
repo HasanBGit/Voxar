@@ -64,9 +64,9 @@ Live WebSocket streams (a 4 s clip):
 
 Text-to-speech through the server: 5.4 to 6.7 req/s for a one-sentence request, with the same overload behavior (503 beyond the queue).
 
-## What the measurements changed
+## Design choices behind the numbers
 
-1. **Concurrency made the server slower, so it now runs one job at a time.** Before: 6.65 req/s with one client but only about 4.5 with two or more, and 5.7 s p95 latency at 16 clients with no limit. Moonshine documents that work on one loaded model is serialized, and we tested whether *separate* model instances would scale: they did not (1 model: 6.82 req/s; 2 models on 2 threads: 5.43; 4 models: 5.00). So each engine has a gate: one job at a time, up to 8 waiting, everything else gets `503` with `Retry-After: 1` immediately.
+1. **The server runs one job at a time.** Without a limit, throughput was 6.65 req/s with one client but only about 4.5 with two or more, and p95 latency was 5.7 s at 16 clients. Moonshine documents that work on one loaded model is serialized, and we tested whether *separate* model instances would scale: they did not (1 model: 6.82 req/s; 2 models on 2 threads: 5.43; 4 models: 5.00). So each engine has a gate: one job at a time, up to 8 waiting, everything else gets `503` with `Retry-After: 1` immediately.
 2. **Long audio is transcribed in coarser chunks.** Feeding 100 ms chunks makes the cost per second grow with file length (RTF 0.042 at 8 s up to 0.114 at 76 s). Chunk size trade-off on the corpus:
 
     | Audio length | CER at 100 ms chunks | CER at 2 s chunks | Speed at 2 s vs 100 ms |
@@ -81,7 +81,7 @@ Text-to-speech through the server: 5.4 to 6.7 req/s for a one-sentence request, 
     So `transcribe` uses 100 ms chunks up to 15 s and 2 s chunks beyond. Short clips need the fine chunks: at 4 s, going to 5 s chunks raises CER from 2.2 % to 7.1 %. An explicit `chunk_ms` always wins. Live streaming is unaffected (it uses whatever chunks you send).
 3. **Moonshine's whole-file mode was tested and not adopted.** It is fastest (RTF 0.015 to 0.024 at every length) but worse on short clips (CER 7.1 % against 2.2 %) and repeats words ("المطعم المطعم"). It could be added later for very long files; the evidence for equal quality on long audio is thin.
 4. **A native warning on every start is hidden.** Moonshine's C++ tokenizer printed a harmless notice to stderr on each run. It is held back during model load and shown only if loading fails.
-5. **The WebSocket capacity refusal was invisible to real clients** (a bare HTTP 403, the same as a security rejection). It now accepts, sends an explanatory message and closes with 1013.
+5. **A full WebSocket server answers explicitly.** A refusal at capacity would look like a bare HTTP 403, the same as a security rejection, so the server accepts, sends an explanatory message and closes with 1013.
 
 ## Reproduce it
 

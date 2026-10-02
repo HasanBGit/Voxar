@@ -19,6 +19,6 @@ Also included: a browser test page served by `voxar serve` ([Local server](local
 ## Where to go next
 
 - [Quickstart](quickstart.md): install, download the model, transcribe.
-- [Command line](cli.md), [Python API](python-api.md), [Agents (MCP)](agents-mcp.md), [Local server](local-server.md).
+- [Command line](cli.md), [Python API](python-api.md), [Agents (MCP) and voice](agents-mcp.md), [Local server](local-server.md), [Language models](llm.md).
 - [THIRD_PARTY_LICENSES.md](../THIRD_PARTY_LICENSES.md): read this before any commercial use. One model's license is unconfirmed.
 - [Architecture](../ARCHITECTURE.md), [threat model](THREAT_MODEL.md), [examples](../examples/README.md), [changelog](../CHANGELOG.md).

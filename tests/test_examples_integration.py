@@ -31,7 +31,12 @@ def wav() -> Path:
 
 def run(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603 - our own examples
-        [sys.executable, *args], capture_output=True, text=True, timeout=300, env=os.environ
+        [sys.executable, *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=300,
+        env=os.environ,
     )
 
 
@@ -56,7 +61,7 @@ def test_batch_example_records_bad_files_and_continues(wav: Path, tmp_path: Path
     out = tmp_path / "out.jsonl"
     result = run(str(ROOT / "examples" / "07_batch_transcribe.py"), str(folder), str(out))
     assert result.returncode == 0, result.stderr
-    rows = {r["file"]: r for r in map(json.loads, out.read_text().splitlines())}
+    rows = {r["file"]: r for r in map(json.loads, out.read_text(encoding="utf-8").splitlines())}
     assert "error" in rows["bad.wav"]
     assert rows["good.wav"]["text"] and rows["good.wav"]["rtf"] > 0
 
