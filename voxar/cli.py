@@ -1,6 +1,7 @@
 """Command line. Thin: parse arguments, call the facade, print results, map errors to exit codes."""
 
 import argparse
+import json
 import os
 import platform
 import sys
@@ -14,19 +15,20 @@ import voxar
 from voxar.api import Voxar
 from voxar.config import Config
 from voxar.domain import AudioChunk, EngineUnavailableError, TranscriptEvent, VoxarError
+from voxar.inbox import Inbox, describe
 from voxar.llm import PROVIDERS, ChatClient, Message, client_from_config
 from voxar.mic import mic_chunks
 from voxar.models import CATALOG, Fetcher, ModelSpec, ModelStore
 from voxar.net import fetcher_for as https_fetcher_for
 from voxar.registry import Registry
-from voxar.voice import Player, VoiceIO, play_audio
+from voxar.voice import Player, VoiceIO, play_audio, record_utterance
 
 EXIT_OK = 0
 EXIT_ERROR = 2
 
 FetcherFactory = Callable[[ModelSpec], Fetcher]
 MicSource = Callable[[], Iterable[AudioChunk]]
-ServeMcp = Callable[[Voxar, Sequence[Path], Callable[[], dict[str, list[str]]], bool], None]
+ServeMcp = Callable[[Voxar, Sequence[Path], Callable[[], dict[str, list[str]]], bool, Path], None]
 ServeHttp = Callable[[Voxar, Callable[[], dict[str, list[str]]], str, int, bool, bool], None]
 LlmFactory = Callable[..., ChatClient]
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
@@ -44,8 +46,10 @@ class _Context:
     serve_http: ServeHttp
     llm: LlmFactory
     play: Player
+    stdin: TextIO
     env: Mapping[str, str]
     out: TextIO
+    err: TextIO
 
 
 def _serve_mcp(
@@ -53,12 +57,14 @@ def _serve_mcp(
     allowed: Sequence[Path],
     engines: Callable[[], dict[str, list[str]]],
     voice: bool,
+    inbox_dir: Path,
 ) -> None:
     try:
         from voxar.mcp_server import build_server
 
         devices = VoiceIO(play=play_audio, listen_chunks=mic_chunks) if voice else None
-        server = build_server(app, allowed, engines, devices)
+        inbox = Inbox(inbox_dir) if voice else None
+        server = build_server(app, allowed, engines, devices, inbox)
     except ImportError as exc:
         raise EngineUnavailableError(
             "the MCP server needs an optional dependency: pip install 'voxar[mcp]'"
@@ -174,6 +180,29 @@ def _parser() -> argparse.ArgumentParser:
         sub.add_argument("--base-url", help="override the provider's URL (https, or localhost)")
     ask.add_argument("--model", help="model id; default: VOXAR_LLM_MODEL or the provider's default")
 
+    inbox = commands.add_parser("inbox", help="spoken messages for a running agent")
+    inbox_commands = inbox.add_subparsers(dest="inbox_command", required=True)
+    hear = inbox_commands.add_parser(
+        "listen", help="listen in this window and put what you say in the agent's inbox"
+    )
+    hear.add_argument(
+        "--always-on",
+        action="store_true",
+        help="listen continuously instead of waiting for Enter (anything the microphone hears, "
+        "including other people and media, becomes an instruction: pair it with --wake)",
+    )
+    hear.add_argument("--wake", metavar="WORD", help="only keep phrases that contain this word")
+    hear.add_argument("--max-seconds", type=float, default=30.0, help="longest phrase (default 30)")
+    hear.add_argument("--silence", type=float, default=1.5, help="end a phrase after this quiet")
+    hear.add_argument("--once", action="store_true", help="stop after one message")
+    read = inbox_commands.add_parser("read", help="print and consume the unread messages")
+    read.add_argument(
+        "--hook",
+        action="store_true",
+        help="print a Claude Code Stop-hook decision so the agent continues with the message",
+    )
+    inbox_commands.add_parser("clear", help="delete all spoken messages")
+
     commands.add_parser("doctor", help="show environment and available engines")
     return parser
 
@@ -189,6 +218,7 @@ def main(
     serve_http: ServeHttp | None = None,
     llm: LlmFactory | None = None,
     play: Player | None = None,
+    stdin: TextIO | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
@@ -211,8 +241,10 @@ def main(
             serve_http=serve_http or _serve_http,
             llm=llm or client_from_config,
             play=play or play_audio,
+            stdin=stdin or sys.stdin,
             env=environment,
             out=out,
+            err=err,
         )
         _run(args, context)
     except (VoxarError, ValueError) as exc:
@@ -222,28 +254,37 @@ def main(
 
 
 def _run(args: argparse.Namespace, ctx: _Context) -> None:
-    if args.command == "transcribe":
-        print(Voxar.from_config(ctx.config, ctx.registry).transcribe(args.file), file=ctx.out)
-    elif args.command == "listen":
-        _listen(ctx)
-    elif args.command == "say":
-        voxar_app = Voxar.from_config(ctx.config, ctx.registry)
-        if args.output:
-            voxar_app.speak_to_file(args.text, args.output, voice=args.voice)
-        else:
-            ctx.play(voxar_app.speak(args.text, voice=args.voice))
-    elif args.command == "mcp":
-        allowed = [Path(d) for d in args.allow_dir] if args.allow_dir else [Path.cwd()]
-        app = Voxar.from_config(ctx.config, ctx.registry)
-        ctx.serve_mcp(app, allowed, ctx.registry.available, args.voice)
-    elif args.command == "serve":
-        _serve(args, ctx)
-    elif args.command == "models":
-        _models(args, ctx)
-    elif args.command == "llm":
-        _llm(args, ctx)
-    elif args.command == "doctor":
-        _doctor(ctx)
+    handlers: dict[str, Callable[[argparse.Namespace, _Context], None]] = {
+        "transcribe": _transcribe,
+        "listen": lambda _args, context: _listen(context),
+        "say": _say,
+        "mcp": _mcp,
+        "serve": _serve,
+        "models": _models,
+        "llm": _llm,
+        "inbox": _inbox,
+        "doctor": lambda _args, context: _doctor(context),
+    }
+    handlers[args.command](args, ctx)
+
+
+def _transcribe(args: argparse.Namespace, ctx: _Context) -> None:
+    print(Voxar.from_config(ctx.config, ctx.registry).transcribe(args.file), file=ctx.out)
+
+
+def _say(args: argparse.Namespace, ctx: _Context) -> None:
+    app = Voxar.from_config(ctx.config, ctx.registry)
+    if args.output:
+        app.speak_to_file(args.text, args.output, voice=args.voice)
+    else:
+        ctx.play(app.speak(args.text, voice=args.voice))
+
+
+def _mcp(args: argparse.Namespace, ctx: _Context) -> None:
+    allowed = [Path(d) for d in args.allow_dir] if args.allow_dir else [Path.cwd()]
+    app = Voxar.from_config(ctx.config, ctx.registry)
+    inbox_dir = ctx.config.cache_dir / "inbox"
+    ctx.serve_mcp(app, allowed, ctx.registry.available, args.voice, inbox_dir)
 
 
 def _serve(args: argparse.Namespace, ctx: _Context) -> None:
@@ -314,6 +355,53 @@ def _llm(args: argparse.Namespace, ctx: _Context) -> None:
         ctx.out.write(piece)
         ctx.out.flush()
     ctx.out.write("\n")
+
+
+def _inbox(args: argparse.Namespace, ctx: _Context) -> None:
+    inbox = Inbox(ctx.config.cache_dir / "inbox")
+    if args.inbox_command == "clear":
+        inbox.clear()
+    elif args.inbox_command == "read":
+        messages = inbox.take()
+        if messages and args.hook:
+            print(
+                json.dumps({"decision": "block", "reason": describe(messages)}, ensure_ascii=False),
+                file=ctx.out,
+            )
+        elif messages:
+            print("\n".join(m.text for m in messages), file=ctx.out)
+    else:
+        _inbox_listen(args, ctx, inbox)
+
+
+def _inbox_listen(args: argparse.Namespace, ctx: _Context, inbox: Inbox) -> None:
+    app = Voxar.from_config(ctx.config, ctx.registry)
+    if args.always_on:
+        print(
+            "always-on: everything the microphone hears becomes an instruction for your agent"
+            + ("" if args.wake else "; add --wake WORD to require a keyword"),
+            file=ctx.err,
+        )
+    try:
+        while True:
+            if not args.always_on:
+                print("press Enter, then speak (Ctrl-C to stop)", file=ctx.err, flush=True)
+                if not ctx.stdin.readline():
+                    return
+            audio = record_utterance(
+                ctx.mic(), max_seconds=args.max_seconds, silence_seconds=args.silence
+            )
+            text = app.transcribe_audio(audio).strip() if audio else ""
+            if args.wake:
+                text = text.replace(args.wake, "", 1).strip() if args.wake in text else ""
+            if not text:
+                continue
+            inbox.add(text)
+            print(f"heard: {text}", file=ctx.out, flush=True)
+            if args.once:
+                return
+    except KeyboardInterrupt:
+        return
 
 
 def _models(args: argparse.Namespace, ctx: _Context) -> None:

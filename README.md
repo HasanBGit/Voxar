@@ -241,8 +241,9 @@ uv run voxar mcp --allow-dir ./audio
 | `announce` (`--voice`) | `message` | speaks a short status update on the speakers |
 | `listen` (`--voice`) | optional `max_seconds`, `silence_seconds` | what you said, as text |
 | `ask` (`--voice`) | `question` | speaks the question, then returns your spoken answer |
+| `check_voice_inbox` (`--voice`) | optional `wait_seconds` | what you said from another window with `voxar inbox listen` |
 
-The voice tools exist only when the server starts with `--voice`: `uv run voxar mcp --voice`. Setup for Claude Code and Codex, a hook that speaks when a turn finishes, and the safety notes are in [docs/agents-mcp.md](docs/agents-mcp.md).
+The voice tools exist only when the server starts with `--voice`: `uv run voxar mcp --voice`. To give a running agent tasks by voice from a second window, run `uv run voxar inbox listen` there (press Enter, speak). Setup for Claude Code and Codex, the hooks, and the safety notes are in [docs/agents-mcp.md](docs/agents-mcp.md).
 
 An agent controls every argument, so file paths must resolve **inside an allowed directory** (default: the working directory; `..` and symlinks cannot escape), `speak` never overwrites a file unless `overwrite=true`, and only WAV audio is read.
 
@@ -409,7 +410,7 @@ Run it through uv from the project folder: `uv run voxar ...`.
 ## Full command reference
 
 ```
-voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,llm,doctor} ...
+voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,llm,inbox,doctor} ...
 
 voxar transcribe sample.wav                    # FILE: 16 kHz mono 16-bit WAV
 voxar say "text" -o out.wav --voice af_msa     # --voice is engine-specific
@@ -419,6 +420,10 @@ voxar models pull moonshine-tiny-streaming-ar --accept-license
 voxar models verify moonshine-tiny-streaming-ar
 voxar mcp --allow-dir ./audio --allow-dir ./recordings   # repeat --allow-dir; default is the working directory
 voxar mcp --voice                              # let the agent speak and listen
+voxar inbox listen                             # speak to a running agent (press Enter, then talk)
+voxar inbox listen --always-on --wake WORD     # hands-free, only phrases containing WORD
+voxar inbox read                               # print and consume the spoken messages
+voxar inbox clear
 voxar serve --host 127.0.0.1 --port 8765
 voxar serve --host 0.0.0.0 --allow-remote      # no authentication: trusted networks only
 voxar llm providers

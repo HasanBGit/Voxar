@@ -1,7 +1,7 @@
 # Command line
 
 ```text
-voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,llm,doctor} ...
+voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,llm,inbox,doctor} ...
 ```
 
 Errors are printed as `error: <message>` with exit code 2 and never as a traceback. Messages say how to fix the problem.
@@ -19,6 +19,9 @@ Errors are printed as `error: <message>` with exit code 2 and never as a traceba
 | `voxar llm providers` | List language-model providers and whether each key is set. See [Language models](llm.md). |
 | `voxar llm models [--provider P]` | List the models your key can use. |
 | `voxar llm ask TEXT [--provider P] [--model M] [--system S] [--no-stream]` | Send one message and print the reply. |
+| `voxar inbox listen [--always-on] [--wake WORD] [--once]` | Listen in this window and put what you say in the inbox a running agent reads. See [Agents (MCP) and voice](agents-mcp.md). |
+| `voxar inbox read [--hook]` | Print and consume the spoken messages; `--hook` prints a Claude Code Stop-hook decision. |
+| `voxar inbox clear` | Delete all spoken messages. |
 | `voxar doctor` | Show versions, cache directory and installed engines. |
 
 ## Models

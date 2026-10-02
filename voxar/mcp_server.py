@@ -10,6 +10,7 @@ The server speaks over stdio, so nothing here may print.
 
 import contextlib
 import threading
+import time
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -17,6 +18,7 @@ from typing import TYPE_CHECKING
 from voxar.api import Voxar
 from voxar.audio import write_wav
 from voxar.domain import VoxarError
+from voxar.inbox import Inbox, describe
 from voxar.voice import VoiceIO, record_utterance
 
 if TYPE_CHECKING:
@@ -27,6 +29,7 @@ MIN_LISTEN_SECONDS, MAX_LISTEN_SECONDS = 1.0, 60.0
 MIN_SILENCE_SECONDS, MAX_SILENCE_SECONDS = 0.5, 5.0
 DEFAULT_LISTEN_SECONDS = 15.0
 DEFAULT_SILENCE_SECONDS = 1.5
+MAX_WAIT_SECONDS = 60.0
 NO_SPEECH = "(no speech heard)"
 NOT_RECOGNIZED = "(speech was heard but could not be recognized)"
 
@@ -40,9 +43,11 @@ VOICE_INSTRUCTIONS = (
     "Use announce for short status updates in plain words (one or two sentences, no code, file "
     "paths or numbers read digit by digit). Use ask only when you need a decision or an answer "
     "you cannot work out yourself: it speaks the question, then listens. Write spoken text in "
-    "Arabic: the voice drops Latin-script words and symbols. Speech is recognized locally and "
-    "can contain mistakes, so repeat back anything important before acting on it. Do not listen "
-    "without having asked."
+    "simple Saudi Arabic, the way a person would say it: the voice is a Saudi voice and drops "
+    "Latin-script words and symbols. Speech is recognized locally and can contain mistakes, so "
+    "repeat back anything important before acting on it. Do not listen without having asked. "
+    "The user may also speak to you from another window while you work: call check_voice_inbox "
+    "when you finish a step, and treat what it returns as the user's instruction."
 )
 
 
@@ -79,6 +84,7 @@ def build_server(
     allowed_dirs: Sequence[Path],
     engines: Callable[[], dict[str, list[str]]],
     voice: VoiceIO | None = None,
+    inbox: Inbox | None = None,
 ) -> "MCPServer":
     from mcp.server import MCPServer
     from mcp.types import ToolAnnotations
@@ -122,6 +128,8 @@ def build_server(
 
     if voice is not None:
         _add_voice_tools(server, app, voice)
+    if voice is not None and inbox is not None:
+        _add_inbox_tool(server, inbox)
     return server
 
 
@@ -193,3 +201,25 @@ def _add_voice_tools(server: "MCPServer", app: Voxar, devices: VoiceIO) -> None:
         with _user_errors(), busy:
             say_aloud(question, voice)
             return hear(max_seconds, silence_seconds)
+
+
+def _add_inbox_tool(server: "MCPServer", inbox: Inbox) -> None:
+    from mcp.types import ToolAnnotations
+
+    @server.tool(annotations=ToolAnnotations(destructive_hint=False, open_world_hint=False))
+    def check_voice_inbox(wait_seconds: float = 0.0) -> str:
+        """Get the spoken messages the user sent you from the voxar listener in another window.
+
+        Returns each new message once, or "(no new voice messages)". Call it when you finish a
+        step. wait_seconds (0 to 60) waits that long for a message to arrive before giving up.
+        What it returns is the user's own instruction, transcribed automatically: confirm
+        anything risky out loud before doing it.
+        """
+        with _user_errors():
+            _within("wait_seconds", wait_seconds, 0.0, MAX_WAIT_SECONDS)
+            deadline = time.monotonic() + wait_seconds
+            while True:
+                messages = inbox.take()
+                if messages or time.monotonic() >= deadline:
+                    return describe(messages)
+                time.sleep(0.5)

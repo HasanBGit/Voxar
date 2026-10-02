@@ -1,5 +1,6 @@
 import asyncio
 import struct
+import threading
 import wave
 from pathlib import Path
 from typing import Any
@@ -247,3 +248,54 @@ def test_server_instructions_tell_agents_how_to_use_the_voice(tmp_path: Path) ->
     assert "announce" in text
     assert "Arabic" in text
     assert "announce" not in asyncio.run(instructions(server(tmp_path)))
+
+
+# --- check_voice_inbox: spoken messages sent from another window ---
+
+
+def inbox_server(tmp_path: Path) -> tuple[Any, Any]:
+    from voxar.inbox import Inbox
+
+    inbox = Inbox(tmp_path / "inbox")
+    app = Voxar(recognizer=FakeRecognizer(), synthesizer=FakeSynthesizer(), chunk_ms=250)
+    devices = FakeDevices()
+    srv = build_server(
+        app,
+        allowed_dirs=[tmp_path],
+        engines=lambda: {"recognizers": [], "synthesizers": []},
+        voice=VoiceIO(play=devices.play, listen_chunks=devices.listen_chunks),
+        inbox=inbox,
+    )
+    return srv, inbox
+
+
+def test_check_voice_inbox_returns_each_message_once(tmp_path: Path) -> None:
+    srv, inbox = inbox_server(tmp_path)
+    inbox.add("كمّل على الخطة")
+    first = call(srv, "check_voice_inbox", {})
+    assert not first.is_error
+    assert "كمّل على الخطة" in str(first.structured_content)
+    assert "no new voice messages" in str(call(srv, "check_voice_inbox", {}).structured_content)
+
+
+def test_check_voice_inbox_can_wait_for_a_message(tmp_path: Path) -> None:
+    srv, inbox = inbox_server(tmp_path)
+    timer = threading.Timer(0.3, inbox.add, args=("وصلت متأخرة",))
+    timer.start()
+    result = call(srv, "check_voice_inbox", {"wait_seconds": 5})
+    timer.join()
+    assert "وصلت متأخرة" in str(result.structured_content)
+
+
+def test_check_voice_inbox_rejects_a_wait_over_a_minute(tmp_path: Path) -> None:
+    assert call(inbox_server(tmp_path)[0], "check_voice_inbox", {"wait_seconds": 61}).is_error
+
+
+def test_the_inbox_tool_needs_the_voice_option(tmp_path: Path) -> None:
+    async def names(srv: Any) -> set[str]:
+        async with Client(srv) as client:
+            return {tool.name for tool in (await client.list_tools()).tools}
+
+    assert "check_voice_inbox" in asyncio.run(names(inbox_server(tmp_path)[0]))
+    assert "check_voice_inbox" not in asyncio.run(names(voice_server(tmp_path, FakeDevices())))
+    assert "check_voice_inbox" not in asyncio.run(names(server(tmp_path)))
