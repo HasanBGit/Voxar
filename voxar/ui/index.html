@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>voxar</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Ccircle cx='80' cy='80' r='78' fill='%230D9488'/%3E%3C/svg%3E">
+<!-- Fonts follow nabrah.ai's stack: Satoshi (headings), Inter (body), Instrument Serif (title), Tajawal (Arabic).
+     They load without blocking the first paint; until they arrive, or offline, the system fonts below are used. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif&family=Tajawal:wght@400;500;700&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap">
+<style>
+:root {
+  --background: hsl(220 23% 97%);
+  --foreground: hsl(222 47% 11%);
+  --card: hsl(0 0% 100%);
+  --muted: hsl(220 14% 96%);
+  --muted-foreground: hsl(220 9% 40%);
+  --border: hsl(220 10% 90%);
+  --primary: hsl(0 0% 0%);
+  --primary-foreground: hsl(0 0% 98%);
+  --ok: #009767;
+  --bad: #b42318;
+  --radius: .5rem;
+  --radius-xl: .75rem;
+  --heading: "Satoshi", "Inter", system-ui, sans-serif;
+  --body: "Inter", system-ui, sans-serif;
+  --arabic: "Tajawal", "Inter", system-ui, sans-serif;
+  --serif: "Instrument Serif", Georgia, serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: hsl(240 10% 4%);
+    --foreground: hsl(0 0% 98%);
+    --card: hsl(0 0% 6%);
+    --muted: hsl(0 0% 12%);
+    --muted-foreground: hsl(0 0% 64%);
+    --border: hsl(0 0% 15%);
+    --primary: hsl(0 0% 98%);
+    --primary-foreground: hsl(0 0% 9%);
+    --ok: #00d294;
+    --bad: #ff8a80;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--background); color: var(--foreground); font: 400 15px/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+[hidden] { display: none !important; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 20px/1 var(--heading); letter-spacing: -.02em; }
+.brand svg { width: 28px; height: 28px; }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 13px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--muted-foreground); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-foreground); }
+.pill[data-state="ok"] .dot { background: var(--ok); }
+.pill[data-state="bad"] .dot { background: var(--bad); }
+h1 { margin: 28px 0 6px; font: 400 clamp(36px, 5vw, 56px)/1.05 var(--serif); letter-spacing: -.01em; }
+.lede { margin: 0 0 28px; color: var(--muted-foreground); font-size: 16px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+section.panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; }
+h2 { margin: 0; font: 700 20px/1.2 var(--heading); letter-spacing: -.01em; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button, .file-btn {
+  appearance: none; font: 500 14px/1 var(--body); cursor: pointer; min-height: 44px; padding: 0 18px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--card); color: var(--foreground); transition: background-color .15s, opacity .15s;
+}
+button:hover:not(:disabled) { background: var(--muted); }
+button.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+button.primary:hover:not(:disabled) { opacity: .88; background: var(--primary); }
+button.small { min-height: 34px; padding: 0 12px; font-size: 13px; color: var(--muted-foreground); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.live { background: var(--bad); border-color: var(--bad); color: #fff; }
+button.live .rec { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #fff; animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+button:focus-visible, textarea:focus-visible, input:focus-visible + .drop, .drop:focus-within { outline: 2px solid var(--foreground); outline-offset: 2px; }
+
+.stage { min-height: 260px; max-height: 420px; overflow: auto; padding: 16px 18px; border-radius: var(--radius); background: var(--muted); font: 400 22px/1.9 var(--arabic); overflow-wrap: anywhere; }
+.stage .final { margin: 0 0 6px; }
+.stage .partial { color: var(--muted-foreground); }
+.stage.empty { color: var(--muted-foreground); font: 400 15px/1.7 var(--body); }
+.note { font-size: 14px; color: var(--muted-foreground); min-height: 1.6em; }
+.note.error { color: var(--bad); }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.level { display: flex; align-items: center; gap: 3px; height: 28px; }
+.level span { width: 4px; height: 100%; border-radius: 2px; background: var(--foreground); opacity: .75; transform: scaleY(.12); transform-origin: center; }
+.elapsed { font-variant-numeric: tabular-nums; color: var(--muted-foreground); font-size: 14px; min-width: 3ch; }
+.hint { color: var(--muted-foreground); font-size: 13px; margin: 0; }
+kbd { font: 500 12px var(--body); padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--muted); }
+
+.drop { display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; text-align: center; padding: 18px; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--muted-foreground); cursor: pointer; transition: border-color .15s, background-color .15s; }
+.drop:hover, .drop.over { border-color: var(--foreground); background: var(--muted); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.drop strong { color: var(--foreground); font-weight: 500; }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted-foreground); cursor: pointer; }
+
+textarea { width: 100%; min-height: 150px; resize: vertical; padding: 14px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--background); color: var(--foreground); font: 400 20px/1.8 var(--arabic); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 34px; padding: 0 12px; font: 400 15px/1 var(--arabic); color: var(--foreground); }
+audio { width: 100%; }
+#tts-result a { color: var(--muted-foreground); font-size: 13px; }
+#tts-result a:hover { color: var(--foreground); }
+.error-box { padding: 12px 14px; border: 1px solid var(--bad); border-radius: var(--radius); color: var(--bad); font-size: 14px; }
+footer { margin: 36px 0 48px; color: var(--muted-foreground); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 24px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 160 160" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0D9488"/><stop offset="1" stop-color="#4F46E5"/></linearGradient></defs><circle cx="80" cy="80" r="78" fill="url(#g)"/><g fill="#fff"><rect x="34" y="68" width="11" height="24" rx="5.5"/><rect x="54" y="56" width="11" height="48" rx="5.5"/><rect x="74.5" y="42" width="11" height="76" rx="5.5"/><rect x="95" y="56" width="11" height="48" rx="5.5"/><rect x="115" y="68" width="11" height="24" rx="5.5"/></g></svg>
+      voxar
+    </div>
+    <span class="pill" id="status" data-state="idle"><span class="dot"></span><span id="status-text">Checking the server</span></span>
+  </header>
+
+  <h1>Speak Arabic. See it as text.</h1>
+  <p class="lede">Everything runs on this computer. No audio leaves it.</p>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="listen-title">
+      <div class="head">
+        <h2 id="listen-title">Listen</h2>
+        <div class="row">
+          <button class="small" id="copy" type="button" hidden>Copy text</button>
+          <button class="small" id="clear" type="button" hidden>Clear</button>
+        </div>
+      </div>
+      <div class="stage empty" id="stage" dir="auto" aria-live="polite">Press Start listening and speak, or drop an audio file below.</div>
+      <div class="note" id="note" role="status"></div>
+      <div class="controls">
+        <button class="primary" id="live-start" type="button">Start listening</button>
+        <div class="level" id="level" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <span class="elapsed" id="elapsed"></span>
+        <span class="note" id="meta"></span>
+      </div>
+      <p class="hint">Press <kbd>Space</kbd> to start or stop. Grey text is still changing; black lines are final.</p>
+      <label class="drop" id="drop">
+        <input id="live-file" type="file" accept="audio/*">
+        <span><strong>Drop an audio file here</strong> or choose one</span>
+        <span>Any format your browser can play. Transcribed in seconds.</span>
+      </label>
+      <label class="check"><input type="checkbox" id="as-live"> Play the file as live, at the speed of speech</label>
+    </section>
+
+    <section class="panel" aria-labelledby="speak-title">
+      <div class="head"><h2 id="speak-title">Speak</h2></div>
+      <textarea id="text" dir="auto" placeholder="اكتب نصًا هنا" aria-label="Text to speak">يا أهلاً وسهلاً، كيف حالكم؟ إن شاء الله طيبين وبأحسن حال.</textarea>
+      <div class="chips" id="chips" aria-label="Sample sentences"></div>
+      <div class="row"><button class="primary" id="speak" type="button">Speak</button></div>
+      <p class="hint">Press <kbd>Ctrl</kbd> or <kbd>Cmd</kbd> + <kbd>Enter</kbd>. Write without full diacritics; Latin-script words are skipped.</p>
+      <div id="tts-result"></div>
+      <div class="note" id="tts-meta"></div>
+    </section>
+  </div>
+
+  <footer>
+    <span id="engines"></span>
+    <span>Pre-alpha. Accuracy on real speakers and on Saudi dialect has not been measured.</span>
+  </footer>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const EMPTY = "Press Start listening and speak, or drop an audio file below.";
+const SAMPLES = ["يا أهلاً وسهلاً، كيف حالكم؟", "الطقس اليوم حلو والسما صافية مرة.", "شكرًا لك على اتصالك بخدمة العملاء."];
+
+// ---- status and engines
+function setStatus(state, text) { $("status").dataset.state = state; $("status-text").textContent = text; }
+
+async function loadHealth() {
+  try {
+    const health = await (await fetch("/health")).json();
+    const stt = health.recognizers.length > 0, tts = health.synthesizers.length > 0;
+    setStatus(stt ? "ok" : "bad", stt ? "Ready" : "No speech-to-text engine installed");
+    $("engines").textContent = "Speech to text: " + (stt ? health.recognizers.join(", ") : "not installed") +
+      "   Text to speech: " + (tts ? health.synthesizers.join(", ") : "not installed");
+    $("live-start").disabled = !stt;
+    $("speak").disabled = !tts;
+    document.querySelectorAll(".chip").forEach((chip) => { chip.disabled = !tts; });
+    if (!stt) setNote("No speech-to-text engine is installed. Install voxar[moonshine], pull the model, then restart the server.", true);
+    if (!tts) showSpeakError("No text-to-speech engine is installed. Install the plugin and set VOXAR_SYNTHESIZER=nabra-saudi, then restart the server.");
+  } catch (e) {
+    setStatus("bad", "Cannot reach the server");
+  }
+}
+
+// ---- the transcript: one surface for live, file and one-shot results
+const transcript = { finals: [], partial: "" };
+
+function setNote(text, isError) { $("note").textContent = text; $("note").className = "note" + (isError ? " error" : ""); }
+
+function renderStage() {
+  const box = $("stage"), has = transcript.finals.length > 0 || transcript.partial;
+  $("copy").hidden = $("clear").hidden = !has;
+  if (!has) { box.className = "stage empty"; box.textContent = live ? "Listening..." : EMPTY; return; }
+  box.className = "stage";
+  box.textContent = "";
+  for (const line of transcript.finals) {
+    const el = document.createElement("div"); el.className = "final"; el.textContent = line; box.appendChild(el);
+  }
+  if (transcript.partial) {
+    const el = document.createElement("div"); el.className = "partial"; el.textContent = transcript.partial; box.appendChild(el);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+$("copy").addEventListener("click", async () => {
+  const text = [...transcript.finals, transcript.partial].filter(Boolean).join("\n");
+  try { await navigator.clipboard.writeText(text); $("copy").textContent = "Copied"; } catch (e) { $("copy").textContent = "Copy failed"; }
+  setTimeout(() => { $("copy").textContent = "Copy text"; }, 1500);
+});
+$("clear").addEventListener("click", () => { transcript.finals = []; transcript.partial = ""; setNote(""); $("meta").textContent = ""; renderStage(); });
+
+// ---- audio helpers: any audio the browser can decode becomes 16 kHz mono 16-bit samples
+let sharedContext = null;
+function audioContext() {
+  // One context for the page's lifetime: creating and closing one per conversion made later decodes stall in testing.
+  if (!sharedContext) {
+    const Context = window.AudioContext || window.webkitAudioContext;
+    try { sharedContext = new Context({ sampleRate: 16000 }); } catch (e) { sharedContext = new Context(); }
+  }
+  return sharedContext;
+}
+
+function withTimeout(promise, ms, message) {
+  let timer;
+  const limit = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); });
+  return Promise.race([promise, limit]).finally(() => clearTimeout(timer));
+}
+
+function resampleLinear(input, from, to) {  // fallback for a browser that ignores the requested sample rate
+  const out = new Float32Array(Math.max(1, Math.round(input.length * to / from)));
+  const ratio = from / to;
+  for (let i = 0; i < out.length; i++) {
+    const position = i * ratio, left = Math.floor(position), right = Math.min(left + 1, input.length - 1);
+    out[i] = input[left] + (input[right] - input[left]) * (position - left);
+  }
+  return out;
+}
+
+function toInt16(floats) {
+  const out = new Int16Array(floats.length);
+  for (let i = 0; i < floats.length; i++) out[i] = Math.max(-1, Math.min(1, floats[i])) * 32767;
+  return out;
+}
+
+async function toWav16k(arrayBuffer) {
+  let decoded;
+  try { decoded = await audioContext().decodeAudioData(arrayBuffer); }
+  catch (e) { throw new Error("This browser cannot read that audio. Try a WAV, MP3 or M4A file."); }
+  const channels = [];
+  for (let c = 0; c < decoded.numberOfChannels; c++) channels.push(decoded.getChannelData(c));
+  let samples = new Float32Array(decoded.length);
+  for (let i = 0; i < samples.length; i++) {
+    let sum = 0;
+    for (const channel of channels) sum += channel[i];
+    samples[i] = sum / channels.length;
+  }
+  if (decoded.sampleRate !== 16000) samples = resampleLinear(samples, decoded.sampleRate, 16000);
+  const wav = new DataView(new ArrayBuffer(44 + samples.length * 2));
+  const text = (offset, value) => { for (let i = 0; i < value.length; i++) wav.setUint8(offset + i, value.charCodeAt(i)); };
+  text(0, "RIFF"); wav.setUint32(4, 36 + samples.length * 2, true); text(8, "WAVE"); text(12, "fmt ");
+  wav.setUint32(16, 16, true); wav.setUint16(20, 1, true); wav.setUint16(22, 1, true);
+  wav.setUint32(24, 16000, true); wav.setUint32(28, 32000, true); wav.setUint16(32, 2, true); wav.setUint16(34, 16, true);
+  text(36, "data"); wav.setUint32(40, samples.length * 2, true);
+  toInt16(samples).forEach((s, i) => wav.setInt16(44 + i * 2, s, true));
+  return { blob: new Blob([wav], { type: "audio/wav" }), seconds: samples.length / 16000 };
+}
+
+// ---- a file: transcribed at once (fast), or played as live
+async function transcribeFile(file) {
+  setNote("Transcribing " + file.name + "..."); $("meta").textContent = "";
+  try {
+    const { blob, seconds } = await withTimeout(toWav16k(await file.arrayBuffer()), 20000, "The browser could not read that audio file.");
+    const started = performance.now();
+    const response = await fetch("/v1/transcribe", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: blob, signal: AbortSignal.timeout(180000) });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || ("Request failed (" + response.status + ")"));
+    const took = (performance.now() - started) / 1000;
+    if (body.text) { transcript.finals.push(body.text); setNote(""); }
+    else setNote("No speech was recognized in " + file.name + ".");
+    $("meta").textContent = seconds.toFixed(1) + " s of audio in " + took.toFixed(2) + " s";
+    renderStage();
+  } catch (e) {
+    setNote(e.name === "TimeoutError" ? "The server did not answer within 3 minutes. Check that voxar serve is still running." : e.message, true);
+  }
+}
+
+function handleFile(file) {
+  if (!file) return;
+  if (live) { setNote("Stop listening before adding a file.", true); return; }
+  if ($("as-live").checked) startLive(fileSource(file)); else transcribeFile(file);
+}
+$("live-file").addEventListener("change", (event) => { const file = event.target.files[0]; event.target.value = ""; handleFile(file); });
+const drop = $("drop");
+for (const name of ["dragenter", "dragover"]) drop.addEventListener(name, (e) => { e.preventDefault(); drop.classList.add("over"); });
+for (const name of ["dragleave", "drop"]) drop.addEventListener(name, (e) => { e.preventDefault(); drop.classList.remove("over"); });
+drop.addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
+
+// ---- live: 16 kHz mono 16-bit frames of 100 ms in, events out, over WS /v1/stream
+const LIVE_FRAME = 1600;
+let live = null, tickTimer = null;
+
+function liveUrl() { return (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/v1/stream"; }
+
+function setLevel(rms) {
+  const bars = $("level").children, strength = Math.min(1, rms * 9);
+  for (let i = 0; i < bars.length; i++) {
+    const shape = [.55, .85, 1, .85, .55][i];
+    bars[i].style.transform = "scaleY(" + (0.12 + 0.88 * strength * shape).toFixed(2) + ")";
+  }
+}
+
+function setLiveRunning(running) {
+  const button = $("live-start");
+  button.classList.toggle("live", running);
+  if (running) button.innerHTML = '<span class="rec"></span>Stop'; else button.textContent = "Start listening";
+  button.disabled = false;
+  $("live-file").disabled = running;
+  clearInterval(tickTimer);
+  if (!running) { setLevel(0); $("elapsed").textContent = ""; return; }
+  const began = Date.now();
+  const tick = () => { const s = Math.floor((Date.now() - began) / 1000); $("elapsed").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+  tick(); tickTimer = setInterval(tick, 500);
+}
+
+function liveMeta(session) {
+  const first = session.firstText === null ? "" : "First text after " + (session.firstText / 1000).toFixed(1) + " s";
+  $("meta").textContent = first;
+}
+
+function sendFrame(session, frame) {
+  const ws = session.ws;
+  if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > 1 << 20) return;  // never queue unbounded audio
+  ws.send(frame.buffer);
+}
+
+function handleLiveEvent(session, event) {
+  if (event.error) { session.error = event.error; return; }
+  if (session.firstText === null && event.text) { session.firstText = performance.now() - session.began; liveMeta(session); }
+  if (event.final) { if (event.text) transcript.finals.push(event.text); transcript.partial = ""; }
+  else transcript.partial = event.text;
+  renderStage();
+}
+
+function endLive(session) {
+  if (session.ending) return;
+  session.ending = true;
+  if (session.source) session.source.stop();
+  if (session.ws.readyState === WebSocket.OPEN) session.ws.send("end");  // the server then sends the final line and closes
+}
+
+function finishLive(session, closeEvent) {
+  if (session.source) session.source.stop();
+  if (live === session) live = null;
+  setLiveRunning(false);
+  transcript.partial = "";
+  if (session.error) setNote(session.error, true);
+  else if (!session.opened) setNote(closeEvent.code === 1013 ? "The server is at its live-stream limit. Try again in a moment."
+    : "Could not open the live connection. Check that voxar serve is running and that this page was opened from its address.", true);
+  else if (!session.heard) setNote("No speech was recognized.");
+  else setNote("");
+  renderStage();
+}
+
+async function startLive(makeSource) {
+  if (live) return;
+  const session = { ws: new WebSocket(liveUrl()), source: null, firstText: null, began: performance.now(), opened: false, ending: false, error: null, heard: false };
+  live = session;
+  setLiveRunning(true); setNote("Connecting..."); $("meta").textContent = "";
+  session.ws.binaryType = "arraybuffer";
+  session.ws.onmessage = (e) => { const event = JSON.parse(e.data); if (event.text) session.heard = true; handleLiveEvent(session, event); };
+  session.ws.onclose = (e) => finishLive(session, e);
+  session.ws.onopen = async () => {
+    session.opened = true; setNote(""); renderStage();
+    try {
+      session.source = await makeSource((frame) => sendFrame(session, frame), () => endLive(session), setLevel);
+      if (session.ending) session.source.stop();
+    } catch (e) { session.error = e.message; endLive(session); }
+  };
+}
+
+async function micSource(send, onEnd, onLevel) {
+  if (!navigator.mediaDevices || !window.AudioWorklet) throw new Error("This browser cannot capture live audio. Use a current Chrome, Edge, Firefox or Safari on http://localhost.");
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { throw new Error("The microphone is blocked. Allow microphone access for this page in the browser's address bar, then try again."); }
+  const Context = window.AudioContext || window.webkitAudioContext;
+  let context;
+  try { context = new Context({ sampleRate: 16000 }); } catch (e) { context = new Context(); }
+  const code = "class Capture extends AudioWorkletProcessor{constructor(){super();this.parts=[];this.count=0}" +
+    "process(inputs){const c=inputs[0][0];if(c){this.parts.push(new Float32Array(c));this.count+=c.length;" +
+    "if(this.count>=" + LIVE_FRAME + "){const o=new Float32Array(this.count);let k=0;for(const p of this.parts){o.set(p,k);k+=p.length}" +
+    "this.parts=[];this.count=0;this.port.postMessage(o,[o.buffer])}}return true}}registerProcessor('voxar-capture',Capture)";
+  const url = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+  try { await context.audioWorklet.addModule(url); } finally { URL.revokeObjectURL(url); }
+  const input = context.createMediaStreamSource(stream);
+  const node = new AudioWorkletNode(context, "voxar-capture");
+  const silent = context.createGain(); silent.gain.value = 0;   // keeps the graph running without playing the mic back
+  node.port.onmessage = (e) => {
+    const samples = context.sampleRate === 16000 ? e.data : resampleLinear(e.data, context.sampleRate, 16000);
+    let sum = 0; for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i];
+    onLevel(Math.sqrt(sum / samples.length));
+    send(toInt16(samples));
+  };
+  input.connect(node); node.connect(silent); silent.connect(context.destination);
+  return { stop() { stream.getTracks().forEach((t) => t.stop()); try { node.disconnect(); input.disconnect(); } catch (e) {} context.close(); } };
+}
+
+function fileSource(file) {
+  return async (send, onEnd, onLevel) => {
+    const { blob } = await withTimeout(toWav16k(await file.arrayBuffer()), 20000, "The browser could not read that audio file.");
+    const pcm = new Int16Array((await blob.arrayBuffer()).slice(44));
+    let position = 0, stopped = false;
+    const started = performance.now();
+    (async () => {  // paced at real time, like a microphone
+      while (!stopped && position < pcm.length) {
+        const frame = pcm.slice(position, position + LIVE_FRAME);
+        let sum = 0; for (let i = 0; i < frame.length; i++) sum += (frame[i] / 32768) ** 2;
+        onLevel(Math.sqrt(sum / frame.length));
+        send(frame);
+        position += LIVE_FRAME;
+        const due = started + (position / 16000) * 1000;
+        await new Promise((r) => setTimeout(r, Math.max(0, due - performance.now())));
+      }
+      if (!stopped) onEnd();
+    })();
+    return { stop() { stopped = true; } };
+  };
+}
+
+function toggleLive() {
+  if ($("live-start").disabled) return;
+  if (live) { $("live-start").disabled = true; endLive(live); } else startLive(micSource);
+}
+$("live-start").addEventListener("click", toggleLive);
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && e.target === document.body) { e.preventDefault(); toggleLive(); }
+});
+
+// ---- text to speech
+let speakAbort = null;
+function showSpeakError(message) {
+  $("tts-result").textContent = "";
+  const box = document.createElement("div"); box.className = "error-box"; box.textContent = message; $("tts-result").appendChild(box);
+}
+
+async function speak() {
+  const button = $("speak"), result = $("tts-result");
+  const text = $("text").value.trim();
+  result.textContent = ""; $("tts-meta").textContent = "";
+  if (!text) { showSpeakError("Write some text first."); return; }
+  if (speakAbort) speakAbort.abort();               // a newer request replaces an older one
+  const abort = speakAbort = new AbortController();
+  button.disabled = true; button.textContent = "Speaking...";
+  try {
+    const started = performance.now();
+    const response = await fetch("/v1/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }), signal: AbortSignal.any([abort.signal, AbortSignal.timeout(180000)]) });
+    if (!response.ok) { const body = await response.json(); throw new Error(body.error || ("Request failed (" + response.status + ")")); }
+    const audio = document.createElement("audio");
+    audio.controls = true; audio.src = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = audio.src; link.download = "voxar-speech.wav"; link.textContent = "Download WAV";
+    result.textContent = ""; result.appendChild(audio); result.appendChild(link); audio.play().catch(() => {});
+    $("tts-meta").textContent = "Generated in " + ((performance.now() - started) / 1000).toFixed(2) + " s";
+  } catch (e) {
+    if (e.name !== "AbortError") showSpeakError(e.name === "TimeoutError" ? "The server did not answer within 3 minutes." : e.message);
+  } finally {
+    if (speakAbort === abort) { speakAbort = null; button.disabled = false; button.textContent = "Speak"; }
+  }
+}
+$("speak").addEventListener("click", speak);
+$("text").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); speak(); } });
+for (const sentence of SAMPLES) {
+  const chip = document.createElement("button");
+  chip.type = "button"; chip.className = "chip"; chip.dir = "rtl"; chip.textContent = sentence;
+  chip.addEventListener("click", () => { $("text").value = sentence; speak(); });
+  $("chips").appendChild(chip);
+}
+
+loadHealth();
+</script>
+</body>
+</html>

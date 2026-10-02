@@ -1,0 +1,22 @@
+voxar-tts-espeak
+Copyright 2026 NAMAA. Licensed under GPL-3.0-only (see LICENSE).
+
+This package includes or depends on third-party work, each under its own license:
+
+Nabra-Saudi-7M (model and its patched Kokoro network code), by oddadmix
+  Apache License 2.0 (LICENSES/Apache-2.0.txt)
+  https://huggingface.co/oddadmix/Nabra-Saudi-7M
+
+Kokoro, by hexgrad
+  Apache License 2.0 (LICENSES/Apache-2.0.txt)
+  https://github.com/hexgrad/kokoro
+
+StyleTTS2, by Aaron (Yinghao) Li (portions of the vendored network code)
+  MIT License, Copyright (c) 2023 Aaron (Yinghao) Li (LICENSES/MIT-StyleTTS2.txt)
+  https://github.com/yl4579/StyleTTS2
+
+Runtime dependencies (not vendored): torch (BSD-style), transformers (Apache-2.0),
+misaki (Apache-2.0), loguru (MIT), numpy (BSD), phonemizer-fork (GPL-3.0+),
+espeakng-loader (MIT wrapper that bundles the GPL-3.0 espeak-ng library).
+
+Modified vendored files carry a "MODIFIED" header; see src/voxar_tts_espeak/_vendor/UPSTREAM.md.

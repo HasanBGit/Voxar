@@ -1,0 +1,20 @@
+voxar
+Copyright 2026 NAMAA
+
+This product is planned to include or depend on third-party software and models.
+Each keeps its own license; none is relicensed by this project.
+
+Moonshine (speech-to-text, streaming models and runtime)
+  Copyright (c) 2025 Useful Sensors, Inc. (dba Moonshine AI)
+  Licensed under the MIT License. See LICENSES/MIT-moonshine-ai.txt
+  https://github.com/moonshine-ai/moonshine
+
+Nabra-Saudi-7M / Nabra-Saudi-82M (text-to-speech, Kokoro/StyleTTS2-based)
+  Author: oddadmix (Hugging Face)
+  Licensed under the Apache License 2.0. See LICENSES/Apache-2.0.txt
+  https://huggingface.co/oddadmix/Nabra-Saudi-7M
+
+Note: the voxar package itself bundles no third-party code or weights. Models are downloaded
+at the user's request (`voxar models pull`) and verified against pinned SHA-256 values. The
+optional plugin `plugins/voxar-tts-espeak` vendors third-party code and has its own NOTICE.
+Verify each upstream license again before release.

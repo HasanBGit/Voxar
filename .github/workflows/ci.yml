@@ -1,0 +1,82 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+      - run: uv sync --extra dev --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+
+  test:
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --extra dev --extra mcp --extra server --frozen   # so those tests run, not skip
+      - run: uv run pytest --cov --cov-report=term-missing
+
+  plugin-tts:
+    # The GPL-3.0 TTS plugin: lint, types and unit tests. They need neither torch nor the model
+    # (torch is imported lazily); real-model tests are opt-in (`pytest -m integration`).
+    needs: lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/voxar-tts-espeak
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+      - run: uv venv .venv
+      - run: uv pip install --no-deps -e . -e ../..
+      - run: uv pip install pytest pytest-cov ruff mypy
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync ruff format --check .
+      - run: uv run --no-sync mypy
+      - run: uv run --no-sync pytest --cov
+
+  license-audit:
+    strategy:
+      matrix:
+        extras: ["", "--extra moonshine --extra mcp --extra server"]   # core alone, then core + all optional extras
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+      # Runtime dependencies only (no dev extra). Substring match: any license text containing
+      # "GPL" (GPL, LGPL, AGPL) or "UNKNOWN" fails the build and needs a human decision.
+      # Exact-string matching missed "GNU General Public License v3 or later (GPLv3+)".
+      # See docs/adr/0002-license-split.md
+      - run: uv sync --frozen --no-dev ${{ matrix.extras }}
+      - run: uv run --no-dev --with pip-licenses pip-licenses --from=mixed --partial-match --fail-on="GPL;UNKNOWN"

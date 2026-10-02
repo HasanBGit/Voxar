@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=77"]   # 77+ for SPDX license expressions and license-files
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voxar"
+dynamic = ["version"]   # single source of truth: __version__ in the package
+description = "Dialect-aware on-device speech (STT and TTS). Pre-alpha."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+dependencies = []
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/HasanBGit/Voxar"
+Issues = "https://github.com/HasanBGit/Voxar/issues"
+
+[project.scripts]
+voxar = "voxar.cli:main"
+
+[project.entry-points."voxar.recognizers"]
+moonshine = "voxar.engines.moonshine:create"
+
+[project.optional-dependencies]
+moonshine = ["moonshine-voice>=0.1.5"]
+mcp = ["mcp>=2.2"]
+server = ["fastapi>=0.142", "uvicorn>=0.54", "websockets>=13"]
+dev = [
+    "ruff>=0.16",
+    "mypy>=2.4",
+    "pytest>=9",
+    "pytest-cov>=7",
+    "hypothesis>=6",
+    "httpx2>=2",           # Starlette's TestClient, for the server tests
+    "pyyaml>=6",           # repo tests that parse the CI workflow files
+    "pip-audit>=2.10",
+    "pip-licenses>=5.5",
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "voxar.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["voxar*"]
+
+[tool.setuptools.package-data]
+voxar = ["py.typed", "ui/*.html"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["plugins"]   # separate projects with their own tooling
+
+[tool.ruff.lint]
+# E/F pyflakes+pycodestyle, I isort, B bugbear, UP pyupgrade, C90 complexity,
+# SIM simplify, N naming, S security (bandit rules)
+select = ["E", "F", "I", "B", "UP", "C90", "SIM", "N", "S"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S104"]  # assert is how pytest works; S104: 0.0.0.0 is a deliberate test input
+"examples/**" = ["S310", "S603", "S607"]  # fixed localhost URL; a fixed ffmpeg command
+"voxar/testing.py" = ["S101"]  # the shipped contract is made of asserts
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["voxar", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not integration'"
+markers = [
+    "integration: needs a real model download; opt in with -m integration",
+]
+
+[tool.coverage.run]
+source = ["voxar"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+
+[[tool.mypy.overrides]]
+# optional, untyped third-party packages that adapters import lazily
+module = ["moonshine_voice", "moonshine_voice.*", "sounddevice"]
+ignore_missing_imports = true

@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=77"]   # 77+ for SPDX license expressions and license-files
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voxar-tts-espeak"
+dynamic = ["version"]   # single source of truth: __version__ in the package
+description = "Saudi-dialect text-to-speech engine for voxar (Nabra-Saudi-7M). GPL-3.0 because it bundles espeak-ng."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-only"
+# The vendored Apache-2.0 and MIT code require their license texts to travel with the package.
+license-files = ["LICENSE", "NOTICE", "LICENSES/*"]
+dependencies = [
+    "voxar",
+    "torch",
+    "transformers",
+    "numpy",
+    "loguru",
+    "misaki",
+    "phonemizer-fork",
+    "espeakng-loader",
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+
+[project.entry-points."voxar.synthesizers"]
+nabra-saudi = "voxar_tts_espeak.engine:create"
+
+[project.optional-dependencies]
+dev = ["pytest>=9", "pytest-cov>=7", "ruff>=0.16", "mypy>=2.4"]
+
+[tool.uv.sources]
+voxar = { path = "../..", editable = true }
+
+[tool.setuptools.dynamic]
+version = { attr = "voxar_tts_espeak.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+voxar_tts_espeak = ["py.typed", "_vendor/*.md"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["src/voxar_tts_espeak/_vendor"]   # third-party code is kept as published
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "C90", "SIM", "N", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+mypy_path = "../.."   # the core package, which an editable install hides from mypy
+files = ["src/voxar_tts_espeak/synthesis.py", "src/voxar_tts_espeak/engine.py", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["torch", "torch.*", "misaki", "misaki.*", "voxar_tts_espeak._vendor.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not integration'"
+markers = ["integration: needs torch and the downloaded Nabra model; opt in with -m integration"]
+
+[tool.coverage.run]
+source = ["voxar_tts_espeak"]
+omit = ["*/_vendor/*", "*/_nabra.py"]   # vendored code, and torch glue covered by integration tests
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true

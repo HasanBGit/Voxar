@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+pip-wheel-metadata/
+
+# virtualenvs (also matches plugins/*/.venv)
+.venv/
+venv/
+env/
+
+# secrets and local config: never committed
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.hf_token
+
+# tool caches and reports
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# docs build
+site/
+
+# model weights and data are never committed
+*.pth
+*.pt
+*.onnx
+*.ort
+*.safetensors
+*.gguf
+*.ckpt
+*.npz
+*.npy
+*.tflite
+*.mlmodel
+*.mlpackage/
+models/
+checkpoints/
+datasets/
+data/
+
+# audio and large media (the logo SVGs in assets/ are unaffected)
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.opus
+*.parquet
+*.arrow
+
+# logs and scratch
+*.log
+tmp/
+scratch/
+
+# editors and OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# local agent state
+.claude/settings.local.json
