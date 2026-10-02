@@ -108,7 +108,7 @@ class Inbox:
             try:
                 os.close(os.open(self._lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
                 break
-            except FileExistsError:
+            except (FileExistsError, PermissionError):  # Windows: a lock being deleted says denied
                 with contextlib.suppress(OSError):
                     if time.time() - self._lock.stat().st_mtime > _STALE_LOCK_S:
                         self._lock.unlink()  # a crashed process left it behind

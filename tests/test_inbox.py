@@ -1,5 +1,6 @@
 """The spoken-message inbox: each message is delivered exactly once, across processes."""
 
+import os
 import threading
 from pathlib import Path
 
@@ -105,3 +106,21 @@ def test_describe_numbers_messages_and_warns_about_mistakes() -> None:
     text = describe([inbox_module.Message(1, "t", "اعمل الاختبارات")])
     assert "1. اعمل الاختبارات" in text
     assert "words may be wrong" in text
+
+
+def test_windows_style_permission_errors_on_the_lock_are_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On Windows, creating a lock file another process is deleting raises PermissionError."""
+    real_open = os.open
+    calls = {"denied": 0}
+
+    def flaky_open(path: str | os.PathLike[str], flags: int, mode: int = 0o777) -> int:
+        if str(path).endswith("inbox.lock") and calls["denied"] < 3:
+            calls["denied"] += 1
+            raise PermissionError(13, "Permission denied")
+        return real_open(path, flags, mode)
+
+    monkeypatch.setattr("voxar.inbox.os.open", flaky_open)
+    assert Inbox(tmp_path).add("حصلت بعد المحاولة").id == 1
+    assert calls["denied"] == 3
