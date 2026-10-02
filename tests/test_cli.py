@@ -220,9 +220,10 @@ def test_models_list_includes_the_real_moonshine_model(tmp_path: Path) -> None:
 def test_mcp_command_serves_with_allowed_dirs(tmp_path: Path) -> None:
     seen: dict[str, Any] = {}
 
-    def fake_serve(app: Any, allowed: Any, engines: Any) -> None:
+    def fake_serve(app: Any, allowed: Any, engines: Any, voice: bool) -> None:
         seen["allowed"] = list(allowed)
         seen["engines"] = engines()
+        seen["voice"] = voice
 
     code, _, _ = run_with(
         ["mcp", "--allow-dir", str(tmp_path / "a"), "--allow-dir", str(tmp_path / "b")],
@@ -232,6 +233,7 @@ def test_mcp_command_serves_with_allowed_dirs(tmp_path: Path) -> None:
     assert code == 0
     assert seen["allowed"] == [tmp_path / "a", tmp_path / "b"]
     assert "moonshine" in seen["engines"]["recognizers"]
+    assert seen["voice"] is False  # the microphone and speakers are opt-in
 
 
 def test_mcp_command_defaults_to_the_working_directory(tmp_path: Path) -> None:
@@ -239,10 +241,38 @@ def test_mcp_command_defaults_to_the_working_directory(tmp_path: Path) -> None:
     code, _, _ = run_with(
         ["mcp"],
         tmp_path,
-        serve_mcp=lambda app, allowed, engines: seen.update(allowed=list(allowed)),
+        serve_mcp=lambda app, allowed, engines, voice: seen.update(allowed=list(allowed)),
     )
     assert code == 0
     assert seen["allowed"] == [Path.cwd()]
+
+
+def test_mcp_voice_flag_enables_the_voice_tools(tmp_path: Path) -> None:
+    seen: dict[str, Any] = {}
+    code, _, _ = run_with(
+        ["mcp", "--voice"],
+        tmp_path,
+        serve_mcp=lambda app, allowed, engines, voice: seen.update(voice=voice),
+    )
+    assert code == 0
+    assert seen == {"voice": True}
+
+
+def test_say_without_an_output_file_plays_on_the_speakers(tmp_path: Path) -> None:
+    played: list[Any] = []
+    out, err = io.StringIO(), io.StringIO()
+    code = main(
+        ["say", "abc"],
+        env={"HOME": str(tmp_path), "VOXAR_SYNTHESIZER": "fake"},
+        registry=registry(),
+        play=played.append,
+        stdout=out,
+        stderr=err,
+    )
+    assert code == 0
+    assert len(played) == 1
+    assert len(played[0].pcm) == 160 * 3 * 2  # FakeSynthesizer: 160 samples per character
+    assert out.getvalue() == ""
 
 
 def test_mcp_command_without_the_extra_gives_an_install_hint(

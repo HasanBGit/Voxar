@@ -22,6 +22,7 @@ Method: lightweight STRIDE per asset. Scope: the voxar library, CLI, MCP server,
 | T9 | Third-party license violation (GPL in core) | Legal | License-audit CI job; ADR 0002 |
 | T10 | An agent reads or overwrites arbitrary files through MCP tools | Files | **Implemented:** MCP paths must resolve (symlinks and `..` included) inside allowed directories (default: the working directory); `speak` never overwrites unless `overwrite=true`; only WAV audio is read |
 | T11 | An LLM API key leaks (logs, errors, redirects, committed files) | Secrets | **Implemented:** keys come from environment variables only; they travel in a request header, are removed from error messages, and redirects are refused so a key is never resent to another host; plain http is refused except for loopback; the repo's gitleaks check covers committed files |
+| T12 | An agent (or text injected into its context) listens through the microphone or speaks unprompted | Audio | **Implemented:** the voice tools exist only with `--voice`; the microphone opens only during a `listen`/`ask` call, for at most 60 s, returns the transcript only and keeps no audio; one voice call at a time; spoken text capped at 500 characters. **Residual:** a client that auto-approves tool calls lets an agent listen whenever it likes, so approve `listen` and `ask` deliberately |
 
 ## Out of scope for v0.1
 Authentication and multi-user serving, adversarial audio attacks on recognition quality, hosted deployment.

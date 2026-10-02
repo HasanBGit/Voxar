@@ -10,11 +10,11 @@ Errors are printed as `error: <message>` with exit code 2 and never as a traceba
 |---|---|
 | `voxar transcribe FILE` | Transcribe a 16 kHz mono 16-bit WAV file and print the final text. |
 | `voxar listen` | Transcribe the microphone live. Partial text updates in place on a terminal; Ctrl-C stops cleanly. |
-| `voxar say TEXT -o OUT.wav [--voice NAME]` | Synthesize speech to a WAV file. Needs a synthesizer (see [Text-to-speech plugin](text-to-speech.md)). |
+| `voxar say TEXT [-o OUT.wav] [--voice NAME]` | Synthesize speech. With `-o` it writes a WAV file; without it, it plays on the speakers. Needs a synthesizer (see [Text-to-speech plugin](text-to-speech.md)). |
 | `voxar models list` | List models voxar knows how to install. |
 | `voxar models pull NAME --accept-license` | Download a model over HTTPS and verify every file's SHA-256. Safe to repeat. |
 | `voxar models verify NAME` | Re-check an installed model's checksums. |
-| `voxar mcp [--allow-dir DIR]...` | Run the MCP server on stdio. See [Agents (MCP)](agents-mcp.md). |
+| `voxar mcp [--allow-dir DIR]... [--voice]` | Run the MCP server on stdio; `--voice` adds the speak and listen tools. See [Agents (MCP) and voice](agents-mcp.md). |
 | `voxar serve [--host H] [--port P] [--allow-remote]` | Run the local HTTP/WebSocket server. See [Local server](local-server.md). |
 | `voxar llm providers` | List language-model providers and whether each key is set. See [Language models](llm.md). |
 | `voxar llm models [--provider P]` | List the models your key can use. |

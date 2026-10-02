@@ -40,9 +40,10 @@ Dependencies point inwards: adapters depend on ports, never the reverse.
 | `voxar.net` | HTTPS-only streaming download for model files; the only module that uses the network | be imported by anything except the CLI |
 | `voxar.mic` | Microphone source (16 kHz mono int16 blocks) via `sounddevice`, bounded queue, Ctrl-C ends the stream cleanly | know about engines |
 | `voxar.llm` | Chat clients for the language model (OpenAI-style and Anthropic protocols, standard library only); https except loopback, no redirects, keys from the environment only. The only module besides `voxar.net` that uses the network | be imported by the core facade, print a key, or follow a redirect |
+| `voxar.voice` | Voice channel: capture one spoken phrase from audio chunks (energy-based, pure), play audio on the speakers (lazy `sounddevice`), and the injected `VoiceIO` pair | know about engines or the network |
 | `voxar.registry` | Look up engines through entry points `voxar.recognizers` / `voxar.synthesizers` | import engines eagerly |
 | `voxar.api` | Small public facade | hold global state |
-| `voxar.mcp_server` | MCP tools for agents; confines file paths to allowed directories; turns our errors into tool errors | print to stdout (it is the protocol channel) |
+| `voxar.mcp_server` | MCP tools for agents; confines file paths to allowed directories; registers the speak/listen tools only when given `VoiceIO` (`--voice`); turns our errors into tool errors | print to stdout (it is the protocol channel) |
 | `voxar.server` | Optional FastAPI app: transcribe, speak, live WebSocket; Host/Origin guard, size and length limits | be imported by the core or by anything except the CLI |
 | `voxar.testing` | Shared engine contract checks that adapters and plugins reuse in their own tests | be imported by production code |
 | `voxar.cli` | `argparse` command line | contain business logic |

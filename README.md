@@ -114,7 +114,7 @@ error: audio must be mono (got 2 channels); convert with: ffmpeg -i INPUT -ar 16
 |---|---|
 | **Speech-to-text from a file** | `voxar transcribe` returns the final text (Moonshine streaming Arabic) |
 | **Saudi-dialect text-to-speech** | `voxar say` writes a 24 kHz WAV, one female voice, through an optional **GPL-3.0** plugin that needs torch |
-| **MCP server for agents** | `transcribe_file`, `speak`, `list_engines` over stdio; file access confined to allowed directories |
+| **MCP server for agents** | `transcribe_file`, `speak`, `list_engines` over stdio; file access confined to allowed directories. With `--voice`, also `announce`, `listen` and `ask`, so an agent such as Claude Code or Codex can speak a status update or hear you ([guide](docs/agents-mcp.md)) |
 | **Language models** | `voxar llm ask/models/providers`: HUMAIN Node (default), OpenRouter, OpenAI, Anthropic, Groq, Together, Mistral, Gemini, Ollama, LM Studio or any compatible server |
 | **Local HTTP/WebSocket server** | `POST /v1/transcribe`, `POST /v1/speak`, live `WS /v1/stream` |
 | **Browser test page** | `voxar serve` serves a page at `/` to upload audio, stream it live, and type text to hear it |
@@ -238,6 +238,11 @@ uv run voxar mcp --allow-dir ./audio
 | `transcribe_file` | `path` | the transcript |
 | `speak` | `text`, `output_path`, optional `voice`, optional `overwrite` | where the WAV was written and its length |
 | `list_engines` | none | installed recognizers and synthesizers |
+| `announce` (`--voice`) | `message` | speaks a short status update on the speakers |
+| `listen` (`--voice`) | optional `max_seconds`, `silence_seconds` | what you said, as text |
+| `ask` (`--voice`) | `question` | speaks the question, then returns your spoken answer |
+
+The voice tools exist only when the server starts with `--voice`: `uv run voxar mcp --voice`. Setup for Claude Code and Codex, a hook that speaks when a turn finishes, and the safety notes are in [docs/agents-mcp.md](docs/agents-mcp.md).
 
 An agent controls every argument, so file paths must resolve **inside an allowed directory** (default: the working directory; `..` and symlinks cannot escape), `speak` never overwrites a file unless `overwrite=true`, and only WAV audio is read.
 
@@ -368,7 +373,7 @@ API keys are read from the provider's own variable (for example `HUMAIN_NODE_API
 - **No telemetry**, no analytics, no phoning home.
 - **Audio never leaves your machine.** Recognition and synthesis run locally. The network is used by `voxar models pull`, which downloads model files over HTTPS from the model's publisher and verifies them, and by `voxar llm`, which sends **only the text you give it** to the provider you pick. Local providers (`ollama`, `lmstudio`) keep even that on your machine.
 - Set `VOXAR_OFFLINE=1` to make any download impossible and to block remote language-model providers.
-- The MCP server runs over stdio (no network). The HTTP server listens on loopback only unless you pass `--allow-remote`.
+- The MCP server runs over stdio (no network). Its voice tools (`--voice`) use the microphone only while an agent's `listen` or `ask` call runs, and return text only. The HTTP server listens on loopback only unless you pass `--allow-remote`.
 - Audio can contain personal data. Do not attach recordings to bug reports.
 
 ---
@@ -407,11 +412,13 @@ Run it through uv from the project folder: `uv run voxar ...`.
 voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,llm,doctor} ...
 
 voxar transcribe sample.wav                    # FILE: 16 kHz mono 16-bit WAV
-voxar say "text" -o out.wav --voice af_msa     # -o is required; --voice is engine-specific
+voxar say "text" -o out.wav --voice af_msa     # --voice is engine-specific
+voxar say "text"                               # no -o: play on the speakers
 voxar models list
 voxar models pull moonshine-tiny-streaming-ar --accept-license
 voxar models verify moonshine-tiny-streaming-ar
 voxar mcp --allow-dir ./audio --allow-dir ./recordings   # repeat --allow-dir; default is the working directory
+voxar mcp --voice                              # let the agent speak and listen
 voxar serve --host 127.0.0.1 --port 8765
 voxar serve --host 0.0.0.0 --allow-remote      # no authentication: trusted networks only
 voxar llm providers

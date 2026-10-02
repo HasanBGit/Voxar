@@ -118,7 +118,7 @@ $ voxar transcribe hello16k.wav
 |---|---|
 | **تحويل ملف صوتي إلى نص** | `voxar transcribe` يعيد النص النهائي (Moonshine العربي المتدفّق) |
 | **نص إلى كلام باللهجة السعودية** | `voxar say` يكتب ملف WAV بتردد 24 كيلوهرتز بصوت أنثوي واحد، عبر إضافة اختيارية بترخيص **GPL-3.0** تحتاج إلى torch |
-| **خادم MCP للوكلاء** | `transcribe_file` و`speak` و`list_engines` عبر stdio، مع حصر الوصول إلى الملفات في مجلدات مسموح بها |
+| **خادم MCP للوكلاء** | `transcribe_file` و`speak` و`list_engines` عبر stdio، مع حصر الوصول إلى الملفات في مجلدات مسموح بها. ومع `--voice` تُضاف `announce` و`listen` و`ask` ليتمكن وكيل مثل Claude Code أو Codex من قول تحديث قصير بصوت عالٍ أو سماعك (انظر [الدليل](../agents-mcp.md)) |
 | **خادم HTTP/WebSocket محلي** | `POST /v1/transcribe` و`POST /v1/speak` و`WS /v1/stream` للبث الحي |
 | **تنزيل نماذج موثَّق** | `voxar models pull/verify`: HTTPS فقط، وبصمة SHA-256 مثبّتة، وتثبيت ذرّي |
 

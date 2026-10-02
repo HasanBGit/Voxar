@@ -19,13 +19,14 @@ from voxar.mic import mic_chunks
 from voxar.models import CATALOG, Fetcher, ModelSpec, ModelStore
 from voxar.net import fetcher_for as https_fetcher_for
 from voxar.registry import Registry
+from voxar.voice import Player, VoiceIO, play_audio
 
 EXIT_OK = 0
 EXIT_ERROR = 2
 
 FetcherFactory = Callable[[ModelSpec], Fetcher]
 MicSource = Callable[[], Iterable[AudioChunk]]
-ServeMcp = Callable[[Voxar, Sequence[Path], Callable[[], dict[str, list[str]]]], None]
+ServeMcp = Callable[[Voxar, Sequence[Path], Callable[[], dict[str, list[str]]], bool], None]
 ServeHttp = Callable[[Voxar, Callable[[], dict[str, list[str]]], str, int, bool, bool], None]
 LlmFactory = Callable[..., ChatClient]
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
@@ -42,17 +43,22 @@ class _Context:
     serve_mcp: ServeMcp
     serve_http: ServeHttp
     llm: LlmFactory
+    play: Player
     env: Mapping[str, str]
     out: TextIO
 
 
 def _serve_mcp(
-    app: Voxar, allowed: Sequence[Path], engines: Callable[[], dict[str, list[str]]]
+    app: Voxar,
+    allowed: Sequence[Path],
+    engines: Callable[[], dict[str, list[str]]],
+    voice: bool,
 ) -> None:
     try:
         from voxar.mcp_server import build_server
 
-        server = build_server(app, allowed, engines)
+        devices = VoiceIO(play=play_audio, listen_chunks=mic_chunks) if voice else None
+        server = build_server(app, allowed, engines, devices)
     except ImportError as exc:
         raise EngineUnavailableError(
             "the MCP server needs an optional dependency: pip install 'voxar[mcp]'"
@@ -110,7 +116,7 @@ def _parser() -> argparse.ArgumentParser:
     say.add_argument(
         "text", help="text to speak (Latin-script words are dropped by the Arabic voice)"
     )
-    say.add_argument("-o", "--output", required=True, help="output WAV path")
+    say.add_argument("-o", "--output", help="write a WAV file here (default: play on the speakers)")
     say.add_argument("--voice", help="voice name; engine-specific (default: the engine's default)")
 
     models = commands.add_parser("models", help="manage models")
@@ -130,6 +136,12 @@ def _parser() -> argparse.ArgumentParser:
         action="append",
         metavar="DIR",
         help="directory the agent may read/write audio in (repeatable; default: current directory)",
+    )
+    serve.add_argument(
+        "--voice",
+        action="store_true",
+        help="also let the agent speak (announce, ask) and listen (listen, ask) through this "
+        "machine's speakers and microphone",
     )
 
     http = commands.add_parser("serve", help="run the local HTTP/WebSocket server")
@@ -176,6 +188,7 @@ def main(
     serve_mcp: ServeMcp | None = None,
     serve_http: ServeHttp | None = None,
     llm: LlmFactory | None = None,
+    play: Player | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
@@ -197,6 +210,7 @@ def main(
             serve_mcp=serve_mcp or _serve_mcp,
             serve_http=serve_http or _serve_http,
             llm=llm or client_from_config,
+            play=play or play_audio,
             env=environment,
             out=out,
         )
@@ -214,10 +228,14 @@ def _run(args: argparse.Namespace, ctx: _Context) -> None:
         _listen(ctx)
     elif args.command == "say":
         voxar_app = Voxar.from_config(ctx.config, ctx.registry)
-        voxar_app.speak_to_file(args.text, args.output, voice=args.voice)
+        if args.output:
+            voxar_app.speak_to_file(args.text, args.output, voice=args.voice)
+        else:
+            ctx.play(voxar_app.speak(args.text, voice=args.voice))
     elif args.command == "mcp":
         allowed = [Path(d) for d in args.allow_dir] if args.allow_dir else [Path.cwd()]
-        ctx.serve_mcp(Voxar.from_config(ctx.config, ctx.registry), allowed, ctx.registry.available)
+        app = Voxar.from_config(ctx.config, ctx.registry)
+        ctx.serve_mcp(app, allowed, ctx.registry.available, args.voice)
     elif args.command == "serve":
         _serve(args, ctx)
     elif args.command == "models":
