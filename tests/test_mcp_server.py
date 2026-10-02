@@ -177,6 +177,14 @@ def test_announce_speaks_on_the_speakers_and_writes_no_file(tmp_path: Path) -> N
     assert list(tmp_path.iterdir()) == []
 
 
+def test_announce_plays_a_long_message_one_sentence_at_a_time(tmp_path: Path) -> None:
+    devices = FakeDevices()
+    message = "تم الانتهاء من الملف الأول. بدأت الآن في الملف الثاني. سأخبرك عند الانتهاء."
+    result = call(voice_server(tmp_path, devices), "announce", {"message": message})
+    assert not result.is_error
+    assert len(devices.played) == 3
+
+
 @pytest.mark.parametrize("message", ["", "   ", "x" * 501])
 def test_announce_rejects_empty_and_long_messages(tmp_path: Path, message: str) -> None:
     devices = FakeDevices()
@@ -189,7 +197,8 @@ def test_listen_returns_the_transcript_of_one_phrase(tmp_path: Path) -> None:
     devices = FakeDevices([speech()])
     result = call(voice_server(tmp_path, devices), "listen", {"silence_seconds": 0.5})
     assert not result.is_error
-    assert "line0:" in str(result.structured_content)  # FakeRecognizer's final line
+    assert result.structured_content["status"] == "heard"
+    assert "line0:" in result.structured_content["text"]  # FakeRecognizer's final line
     assert devices.opened == 1
 
 
@@ -197,7 +206,7 @@ def test_listen_reports_silence_as_a_result_not_an_error(tmp_path: Path) -> None
     devices = FakeDevices([[AudioChunk(pcm=bytes(3200))] * 200])
     result = call(voice_server(tmp_path, devices), "listen", {"max_seconds": 1.0})
     assert not result.is_error
-    assert "no speech heard" in str(result.structured_content)
+    assert result.structured_content == {"status": "silence", "text": ""}
 
 
 @pytest.mark.parametrize(
@@ -274,8 +283,11 @@ def test_check_voice_inbox_returns_each_message_once(tmp_path: Path) -> None:
     inbox.add("كمّل على الخطة")
     first = call(srv, "check_voice_inbox", {})
     assert not first.is_error
-    assert "كمّل على الخطة" in str(first.structured_content)
-    assert "no new voice messages" in str(call(srv, "check_voice_inbox", {}).structured_content)
+    assert first.structured_content["count"] == 1
+    assert first.structured_content["messages"] == ["كمّل على الخطة"]
+    assert "confirm anything risky" in first.structured_content["note"]
+    empty = call(srv, "check_voice_inbox", {}).structured_content
+    assert empty == {"count": 0, "messages": [], "note": ""}
 
 
 def test_check_voice_inbox_can_wait_for_a_message(tmp_path: Path) -> None:
@@ -299,3 +311,28 @@ def test_the_inbox_tool_needs_the_voice_option(tmp_path: Path) -> None:
     assert "check_voice_inbox" in asyncio.run(names(inbox_server(tmp_path)[0]))
     assert "check_voice_inbox" not in asyncio.run(names(voice_server(tmp_path, FakeDevices())))
     assert "check_voice_inbox" not in asyncio.run(names(server(tmp_path)))
+
+
+def test_a_second_voice_call_gives_up_instead_of_waiting_forever(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("voxar.mcp_server.VOICE_BUSY_WAIT_S", 0.2)
+    entered, release = threading.Event(), threading.Event()
+
+    class SlowDevices(FakeDevices):
+        def play(self, audio: Any) -> None:
+            entered.set()
+            assert release.wait(timeout=10)
+
+    devices = SlowDevices()
+    srv = voice_server(tmp_path, devices)
+    first = threading.Thread(target=call, args=(srv, "announce", {"message": "أولى"}))
+    first.start()
+    assert entered.wait(timeout=10)
+    try:
+        second = call(srv, "announce", {"message": "ثانية"})
+        assert second.is_error
+        assert "another voice call" in str(second.content)
+    finally:
+        release.set()
+        first.join(timeout=10)

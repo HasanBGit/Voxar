@@ -23,11 +23,13 @@ Speaking needs a synthesizer: install the [text-to-speech plugin](text-to-speech
 | `speak` | `text`, `output_path`, optional `voice`, optional `overwrite` (default false) | where the WAV was written and its length |
 | `list_engines` | none | installed recognizers and synthesizers |
 | `announce` *(voice)* | `message` (up to 500 characters), optional `voice` | speaks it on the speakers; returns when finished |
-| `listen` *(voice)* | `max_seconds` (1 to 60, default 15), `silence_seconds` (0.5 to 5, default 1.5) | what the user said, or `(no speech heard)` |
-| `ask` *(voice)* | `question`, plus the `listen` arguments and `voice` | speaks the question, then returns the spoken answer |
-| `check_voice_inbox` *(voice)* | optional `wait_seconds` (0 to 60) | the spoken messages you sent from the listener window since the last check, each delivered once |
+| `listen` *(voice)* | `max_seconds` (1 to 60, default 15), `silence_seconds` (0.5 to 5, default 1.5) | `{status, text}`: `status` is `heard`, `silence` or `unrecognized`; `text` is empty unless `heard` |
+| `ask` *(voice)* | `question`, plus the `listen` arguments and `voice` | speaks the question, then returns the answer in the same `{status, text}` form as `listen` |
+| `check_voice_inbox` *(voice)* | optional `wait_seconds` (0 to 60) | `{count, messages, note}`: the spoken messages you sent from the listener window since the last check, each delivered once; `note` reminds the agent that speech can be misheard |
 
-Recording starts at the first speech and ends after the silence gap or at `max_seconds`. Nothing is kept except the transcript text. Calls run one at a time, so an update never talks over a question.
+`announce` and `ask` speak one sentence at a time, synthesizing the next while the previous plays, so a long message starts sooner. `voxar mcp --voice` loads the speech engines when it starts (the first spoken update would otherwise wait several seconds for the voice to load), which keeps their memory in use for as long as the server runs.
+
+Recording starts at the first speech and ends after the silence gap or at `max_seconds`. By default speech is detected by volume, which a noisy room can fool. For a neural detector install the extra and the model (`uv sync --extra vad`, `uv run voxar models pull silero-vad --accept-license`); `voxar doctor` then shows `voice detection: silero`. Nothing is kept except the transcript text. Calls run one at a time, so an update never talks over a question; a call that has waited 30 s for another one gets an error saying so instead of hanging.
 
 The server also sends the agent short instructions: keep announcements to one or two plain sentences in Arabic, use `ask` only for a decision, and repeat back anything important because recognition can make mistakes.
 

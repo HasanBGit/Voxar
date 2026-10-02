@@ -220,7 +220,9 @@ def test_models_list_includes_the_real_moonshine_model(tmp_path: Path) -> None:
 def test_mcp_command_serves_with_allowed_dirs(tmp_path: Path) -> None:
     seen: dict[str, Any] = {}
 
-    def fake_serve(app: Any, allowed: Any, engines: Any, voice: bool, inbox_dir: Path) -> None:
+    def fake_serve(
+        app: Any, allowed: Any, engines: Any, voice: bool, inbox_dir: Path, config: Any
+    ) -> None:
         seen["allowed"] = list(allowed)
         seen["engines"] = engines()
         seen["voice"] = voice
@@ -241,7 +243,7 @@ def test_mcp_command_defaults_to_the_working_directory(tmp_path: Path) -> None:
     code, _, _ = run_with(
         ["mcp"],
         tmp_path,
-        serve_mcp=lambda app, allowed, engines, voice, inbox_dir: seen.update(
+        serve_mcp=lambda app, allowed, engines, voice, inbox_dir, config: seen.update(
             allowed=list(allowed)
         ),
     )
@@ -254,12 +256,23 @@ def test_mcp_voice_flag_enables_the_voice_tools(tmp_path: Path) -> None:
     code, _, _ = run_with(
         ["mcp", "--voice"],
         tmp_path,
-        serve_mcp=lambda app, allowed, engines, voice, inbox_dir: seen.update(
+        serve_mcp=lambda app, allowed, engines, voice, inbox_dir, config: seen.update(
             voice=voice, inbox_dir=inbox_dir
         ),
     )
     assert code == 0
     assert seen == {"voice": True, "inbox_dir": tmp_path / ".cache" / "voxar" / "inbox"}
+
+
+@pytest.mark.parametrize(("flags", "warmed"), [(["--voice"], True), ([], False)])
+def test_only_the_voice_server_loads_its_engines_at_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, flags: list[str], warmed: bool
+) -> None:
+    calls: list[Any] = []
+    monkeypatch.setattr("voxar.cli._warm_in_background", calls.append)
+    code, _, _ = run_with(["mcp", *flags], tmp_path, serve_mcp=lambda *args: None)
+    assert code == 0
+    assert bool(calls) is warmed  # the first spoken update should not wait for the voice to load
 
 
 def test_say_without_an_output_file_plays_on_the_speakers(tmp_path: Path) -> None:
@@ -295,13 +308,19 @@ def test_serve_defaults_to_loopback(tmp_path: Path) -> None:
     seen: dict[str, Any] = {}
 
     def fake_serve(
-        app: Any, engines: Any, host: str, port: int, allow_remote: bool, warm: bool
+        app: Any, engines: Any, host: str, port: int, allow_remote: bool, warm: bool, token: Any
     ) -> None:
-        seen.update(host=host, port=port, allow_remote=allow_remote, warm=warm)
+        seen.update(host=host, port=port, allow_remote=allow_remote, warm=warm, token=token)
 
     code, _, _ = run_with(["serve"], tmp_path, serve_http=fake_serve)
     assert code == 0
-    assert seen == {"host": "127.0.0.1", "port": 8765, "allow_remote": False, "warm": True}
+    assert seen == {
+        "host": "127.0.0.1",
+        "port": 8765,
+        "allow_remote": False,
+        "warm": True,
+        "token": None,  # loopback needs no token
+    }
 
 
 def test_serve_refuses_a_public_address_without_allow_remote(tmp_path: Path) -> None:
@@ -321,12 +340,24 @@ def test_serve_allows_a_public_address_when_explicit(tmp_path: Path) -> None:
     code, _, _ = run_with(
         ["serve", "--host", "0.0.0.0", "--port", "9000", "--allow-remote"],
         tmp_path,
-        serve_http=lambda app, engines, host, port, remote, warm: seen.update(
-            host=host, remote=remote
+        serve_http=lambda app, engines, host, port, remote, warm, token: seen.update(
+            host=host, remote=remote, token=token
         ),
     )
     assert code == 0
-    assert seen == {"host": "0.0.0.0", "remote": True}
+    assert seen["host"] == "0.0.0.0" and seen["remote"] is True
+    assert len(seen["token"]) >= 32  # exposing the server always comes with a random token
+
+
+def test_every_exposed_start_gets_a_new_token_and_prints_the_link(tmp_path: Path) -> None:
+    tokens: list[str] = []
+
+    def record(*args: Any) -> None:
+        tokens.append(args[-1])
+
+    for _ in range(2):
+        run_with(["serve", "--host", "0.0.0.0", "--allow-remote"], tmp_path, serve_http=record)
+    assert tokens[0] != tokens[1]
 
 
 def test_serve_without_the_extra_gives_an_install_hint(
@@ -356,7 +387,7 @@ def test_no_warm_flag_is_passed_to_the_server(tmp_path: Path) -> None:
     code, _, _ = run_with(
         ["serve", "--no-warm"],
         tmp_path,
-        serve_http=lambda app, engines, host, port, remote, warm: seen.update(warm=warm),
+        serve_http=lambda app, engines, host, port, remote, warm, token: seen.update(warm=warm),
     )
     assert code == 0
     assert seen == {"warm": False}

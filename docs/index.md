@@ -11,7 +11,7 @@ Dialect-aware speech for devices that cannot afford a GPU: streaming speech-to-t
 | Arabic speech-to-text from a WAV file | `voxar transcribe` | Moonshine streaming Arabic (extra `voxar[moonshine]`) |
 | Saudi-dialect text-to-speech | `voxar say` | Optional **GPL-3.0** plugin, needs torch; one female voice |
 | Agent access | `voxar mcp` | MCP over stdio; file access confined to allowed directories |
-| App access | `voxar serve` | Local HTTP/WebSocket and a browser test page; **no authentication**: keep it on localhost |
+| App access | `voxar serve` | Local HTTP/WebSocket and a browser test page; keep it on localhost; if exposed it is protected only by a token, over plain HTTP |
 | Model download | `voxar models pull` | HTTPS only, every file checked against a pinned SHA-256 |
 
 Also included: a browser test page served by `voxar serve` ([Local server](local-server.md)).

@@ -133,7 +133,22 @@ _MOONSHINE_AR_LICENSE = (
 # re-verified on every download. Weights are loaded with torch.load(weights_only=True) only.
 _NABRA = "https://huggingface.co/oddadmix/Nabra-Saudi-7M/resolve/ef45d882f20355767190dffb2a34393ed1df74fa"
 
+# Pinned to a release tag of snakers4/silero-vad (MIT). The hash is that of the file as measured.
+_SILERO = "https://raw.githubusercontent.com/snakers4/silero-vad/v6.2.3/src/silero_vad/data"
+
 CATALOG: Mapping[str, ModelSpec] = {
+    "silero-vad": ModelSpec(
+        id="silero-vad",
+        revision="v6.2.3",
+        license="MIT",
+        source=_SILERO,
+        files=(
+            ModelFile(
+                "silero_vad.onnx",
+                "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3",
+            ),
+        ),
+    ),
     "nabra-saudi-7m": ModelSpec(
         id="nabra-saudi-7m",
         revision="ef45d882f20355767190dffb2a34393ed1df74fa",

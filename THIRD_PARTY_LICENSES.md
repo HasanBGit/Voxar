@@ -12,6 +12,7 @@ Checked 2026-10-02 against the model cards, Hugging Face API and Moonshine's `LI
 | Moonshine runtime / library | https://github.com/moonshine-ai/moonshine | MIT | On-device inference | The repo's MIT covers code outside `core/third-party`. |
 | Nabra-Saudi-7M | https://huggingface.co/oddadmix/Nabra-Saudi-7M @ `ef45d882f20355767190dffb2a34393ed1df74fa` | Apache-2.0 | TTS model, run by the GPL-3.0 plugin `voxar-tts-espeak`; weights downloaded by `voxar models pull nabra-saudi-7m` with pinned SHA-256 | Weights load with `torch.load(weights_only=True)`. Its patched Kokoro code is vendored (reviewed, network fallbacks removed) in the plugin; see `plugins/voxar-tts-espeak/src/voxar_tts_espeak/_vendor/UPSTREAM.md`. The voice's speaker consent is not documented upstream (see DATA.md). |
 | Nabra-Saudi-82M (teacher) | https://huggingface.co/oddadmix/Nabra-Saudi-82M | Apache-2.0 | Distillation teacher for new voices | |
+| Silero VAD | https://github.com/snakers4/silero-vad @ `v6.2.3` (file `src/silero_vad/data/silero_vad.onnx`, 2,327,524 bytes) | MIT (repo `LICENSE`, checked 2026-10-02) | Voice-activity detection for `listen`/`ask`/`inbox listen`, downloaded by `voxar models pull silero-vad` with pinned SHA-256 and run with `onnxruntime` (extra `vad`) | Used instead of the `silero-vad` pip package, which requires torch. |
 | sherpa-onnx | https://github.com/k2-fsa/sherpa-onnx | Apache-2.0 | ONNX runtime and export recipes | License confirmed via GitHub API 2026-10-02. |
 
 ### Open license question: Moonshine Arabic model (checked 2026-10-02)
@@ -33,6 +34,15 @@ Assessment: most likely MIT and the warning is stale, but this is not confirmed.
 | google-crc32c, requests | Apache-2.0 |
 | tqdm | MPL-2.0 AND MIT (weak, file-level copyleft; fine as an unmodified dependency) |
 | filelock, platformdirs | MIT |
+
+### Optional extra `vad` (checked 2026-10-02 with `pip-licenses`)
+
+| Package | License |
+|---|---|
+| onnxruntime | MIT |
+| flatbuffers | Apache-2.0 |
+| protobuf, sympy, mpmath | BSD |
+| coloredlogs, humanfriendly | MIT |
 
 ### Optional extras `mcp` and `server` (checked 2026-10-02 with `pip-licenses` in a clean environment and `pip-audit`: no GPL, no unknown licenses, no known vulnerabilities)
 

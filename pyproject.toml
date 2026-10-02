@@ -30,6 +30,7 @@ moonshine = "voxar.engines.moonshine:create"
 [project.optional-dependencies]
 moonshine = ["moonshine-voice>=0.1.5"]
 mcp = ["mcp>=2.2"]
+vad = ["onnxruntime>=1.20"]
 server = ["fastapi>=0.142", "uvicorn>=0.54", "websockets>=13"]
 dev = [
     "ruff>=0.16",
@@ -92,5 +93,5 @@ show_missing = true
 
 [[tool.mypy.overrides]]
 # optional, untyped third-party packages that adapters import lazily
-module = ["moonshine_voice", "moonshine_voice.*", "sounddevice"]
+module = ["moonshine_voice", "moonshine_voice.*", "sounddevice", "onnxruntime", "onnxruntime.*"]
 ignore_missing_imports = true

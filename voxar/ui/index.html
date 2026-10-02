@@ -240,6 +240,7 @@ const STRINGS = {
     err_audio: "This browser cannot read that audio. Try a WAV, MP3 or M4A file.", err_audio_file: "The browser could not read that audio file.",
     err_timeout: "The server did not answer within 3 minutes. Check that voxar serve is still running.",
     err_speak_timeout: "The server did not answer within 3 minutes.",
+    err_dropped: "Some audio was skipped because the connection was too slow, so the text may be missing words.",
     err_failed: "Request failed ({status})", err_limit: "The server is at its live-stream limit. Try again in a moment.",
     err_connect: "Could not open the live connection. Check that voxar serve is running and that this page was opened from its address.",
     err_capture: "This browser cannot capture live audio. Use a current Chrome, Edge, Firefox or Safari on localhost.",
@@ -270,6 +271,7 @@ const STRINGS = {
     err_audio: "لا يستطيع هذا المتصفح قراءة هذا الصوت. جرّب ملف WAV أو MP3 أو M4A.", err_audio_file: "تعذّر على المتصفح قراءة الملف الصوتي.",
     err_timeout: "لم يردّ الخادم خلال 3 دقائق. تأكد أن voxar serve ما زال يعمل.",
     err_speak_timeout: "لم يردّ الخادم خلال 3 دقائق.",
+    err_dropped: "تم تخطّي جزء من الصوت لأن الاتصال كان بطيئًا، فقد ينقص النص بعض الكلمات.",
     err_failed: "فشل الطلب ({status})", err_limit: "وصل الخادم إلى حدّ البثّ المباشر. حاول بعد قليل.",
     err_connect: "تعذّر فتح الاتصال المباشر. تأكد أن voxar serve يعمل وأنك فتحت هذه الصفحة من عنوانه.",
     err_capture: "لا يستطيع هذا المتصفح التقاط الصوت المباشر. استخدم نسخة حديثة من Chrome أو Edge أو Firefox أو Safari على localhost.",
@@ -585,7 +587,8 @@ function liveMeta(session) {
 
 function sendFrame(session, frame) {
   const ws = session.ws;
-  if (ws.readyState !== WebSocket.OPEN || ws.bufferedAmount > 1 << 20) return;  // never queue unbounded audio
+  if (ws.readyState !== WebSocket.OPEN) return;
+  if (ws.bufferedAmount > 1 << 20) { session.dropped = true; return; }  // never queue unbounded audio
   ws.send(frame.buffer);
 }
 
@@ -610,6 +613,7 @@ function finishLive(session, closeEvent) {
   setLiveRunning(false);
   transcript.partial = "";
   if (session.error) setNote(raw(session.error), "error");
+  else if (session.dropped) setNote(msg("err_dropped"), "error");
   else if (!session.opened) setNote(msg(closeEvent.code === 1013 ? "err_limit" : "err_connect"), "error");
   else if (!session.heard) setNote(msg("no_speech"));
   else setNote(null);
@@ -657,7 +661,7 @@ async function micSource(send, onEnd, onLevel) {
     send(toInt16(samples));
   };
   input.connect(node); node.connect(silent); silent.connect(context.destination);
-  return { stop() { stream.getTracks().forEach((t) => t.stop()); try { node.disconnect(); input.disconnect(); } catch (e) {} context.close(); } };
+  return { stop() { stream.getTracks().forEach((t) => t.stop()); try { node.disconnect(); input.disconnect(); } catch (e) {} if (context.state !== "closed") context.close().catch(() => {}); } };
 }
 
 function fileSource(file) {

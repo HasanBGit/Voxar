@@ -12,14 +12,15 @@ import contextlib
 import threading
 import time
 from collections.abc import Callable, Iterator, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from voxar.api import Voxar
 from voxar.audio import write_wav
 from voxar.domain import VoxarError
-from voxar.inbox import Inbox, describe
-from voxar.voice import VoiceIO, record_utterance
+from voxar.inbox import VOICE_NOTE, Inbox
+from voxar.voice import VoiceIO, record_utterance, speak_aloud
 
 if TYPE_CHECKING:
     from mcp.server import MCPServer
@@ -30,8 +31,25 @@ MIN_SILENCE_SECONDS, MAX_SILENCE_SECONDS = 0.5, 5.0
 DEFAULT_LISTEN_SECONDS = 15.0
 DEFAULT_SILENCE_SECONDS = 1.5
 MAX_WAIT_SECONDS = 60.0
-NO_SPEECH = "(no speech heard)"
-NOT_RECOGNIZED = "(speech was heard but could not be recognized)"
+VOICE_BUSY_WAIT_S = 30.0  # how long a voice call waits for another one before giving up
+
+
+@dataclass
+class Heard:
+    """What ``listen`` and ``ask`` return: ``text`` is empty unless ``status`` is "heard"."""
+
+    status: Literal["heard", "silence", "unrecognized"]
+    text: str
+
+
+@dataclass
+class VoiceMessages:
+    """What ``check_voice_inbox`` returns: ``note`` is the safety reminder for the agent."""
+
+    count: int
+    messages: list[str] = field(default_factory=list)
+    note: str = ""
+
 
 INSTRUCTIONS = (
     "voxar is an on-device speech toolbox. transcribe_file turns a WAV file into Arabic text; "
@@ -71,6 +89,19 @@ def _user_errors() -> Iterator[None]:
         yield
     except (VoxarError, ValueError) as exc:
         raise ToolError(str(exc)) from exc
+
+
+@contextlib.contextmanager
+def _exclusive(lock: threading.Lock) -> Iterator[None]:
+    """Hold the lock, or say so after a while instead of leaving the agent waiting forever."""
+    if not lock.acquire(timeout=VOICE_BUSY_WAIT_S):
+        raise ValueError(
+            "another voice call is still running (the user may be speaking); try again shortly"
+        )
+    try:
+        yield
+    finally:
+        lock.release()
 
 
 def _within(name: str, value: float, low: float, high: float) -> float:
@@ -148,19 +179,22 @@ def _add_voice_tools(server: "MCPServer", app: Voxar, devices: VoiceIO) -> None:
                 f"message is {len(text)} characters; keep spoken updates under "
                 f"{MAX_ANNOUNCE_CHARS} (one or two short sentences)"
             )
-        audio = app.speak(text, voice=voice_name)
-        devices.play(audio)
-        return f"spoke {len(audio.pcm) / 2 / audio.sample_rate:.1f} s"
+        seconds = speak_aloud(lambda part: app.speak(part, voice=voice_name), devices.play, text)
+        return f"spoke {seconds:.1f} s"
 
-    def hear(max_seconds: float, silence_seconds: float) -> str:
+    def hear(max_seconds: float, silence_seconds: float) -> Heard:
         _within("max_seconds", max_seconds, MIN_LISTEN_SECONDS, MAX_LISTEN_SECONDS)
         _within("silence_seconds", silence_seconds, MIN_SILENCE_SECONDS, MAX_SILENCE_SECONDS)
         audio = record_utterance(
-            devices.listen_chunks(), max_seconds=max_seconds, silence_seconds=silence_seconds
+            devices.listen_chunks(),
+            max_seconds=max_seconds,
+            silence_seconds=silence_seconds,
+            is_speech=devices.speech_test() if devices.speech_test else None,
         )
         if audio is None:
-            return NO_SPEECH
-        return app.transcribe_audio(audio).strip() or NOT_RECOGNIZED
+            return Heard("silence", "")
+        text = app.transcribe_audio(audio).strip()
+        return Heard("heard", text) if text else Heard("unrecognized", "")
 
     @server.tool(annotations=local)
     def announce(message: str, voice: str | None = None) -> str:
@@ -169,21 +203,23 @@ def _add_voice_tools(server: "MCPServer", app: Voxar, devices: VoiceIO) -> None:
         Write one or two plain sentences in Arabic (the voice drops Latin-script words and
         symbols), at most 500 characters. Returns when the speech has finished.
         """
-        with _user_errors(), busy:
+        with _user_errors(), _exclusive(busy):
             return say_aloud(message, voice)
 
     @server.tool(annotations=local)
     def listen(
         max_seconds: float = DEFAULT_LISTEN_SECONDS,
         silence_seconds: float = DEFAULT_SILENCE_SECONDS,
-    ) -> str:
+    ) -> Heard:
         """Listen on the microphone for one spoken phrase and return what the user said.
 
         Recording starts at the first speech, ends after silence_seconds of quiet (0.5 to 5) or
-        max_seconds in total (1 to 60), and nothing is kept except the text. Returns
-        "(no speech heard)" if the user stays silent. Speech recognition can make mistakes.
+        max_seconds in total (1 to 60), and nothing is kept except the text. The result has a
+        status: "heard" (text holds the words), "silence" (the user said nothing) or
+        "unrecognized" (speech was heard but no words came out). Speech recognition can make
+        mistakes.
         """
-        with _user_errors(), busy:
+        with _user_errors(), _exclusive(busy):
             return hear(max_seconds, silence_seconds)
 
     @server.tool(annotations=local)
@@ -192,13 +228,13 @@ def _add_voice_tools(server: "MCPServer", app: Voxar, devices: VoiceIO) -> None:
         max_seconds: float = DEFAULT_LISTEN_SECONDS,
         silence_seconds: float = DEFAULT_SILENCE_SECONDS,
         voice: str | None = None,
-    ) -> str:
+    ) -> Heard:
         """Speak a question aloud, then listen for the user's spoken answer and return it.
 
         Use it when you need a decision. The question follows the same rules as announce; the
         answer follows the same rules as listen.
         """
-        with _user_errors(), busy:
+        with _user_errors(), _exclusive(busy):
             say_aloud(question, voice)
             return hear(max_seconds, silence_seconds)
 
@@ -207,13 +243,13 @@ def _add_inbox_tool(server: "MCPServer", inbox: Inbox) -> None:
     from mcp.types import ToolAnnotations
 
     @server.tool(annotations=ToolAnnotations(destructive_hint=False, open_world_hint=False))
-    def check_voice_inbox(wait_seconds: float = 0.0) -> str:
+    def check_voice_inbox(wait_seconds: float = 0.0) -> VoiceMessages:
         """Get the spoken messages the user sent you from the voxar listener in another window.
 
-        Returns each new message once, or "(no new voice messages)". Call it when you finish a
-        step. wait_seconds (0 to 60) waits that long for a message to arrive before giving up.
-        What it returns is the user's own instruction, transcribed automatically: confirm
-        anything risky out loud before doing it.
+        Returns each new message once (count 0 and no messages if there are none). Call it when
+        you finish a step. wait_seconds (0 to 60) waits that long for a message to arrive before
+        giving up. The messages are the user's own instruction, transcribed automatically:
+        confirm anything risky out loud before doing it.
         """
         with _user_errors():
             _within("wait_seconds", wait_seconds, 0.0, MAX_WAIT_SECONDS)
@@ -221,5 +257,9 @@ def _add_inbox_tool(server: "MCPServer", inbox: Inbox) -> None:
             while True:
                 messages = inbox.take()
                 if messages or time.monotonic() >= deadline:
-                    return describe(messages)
+                    return VoiceMessages(
+                        count=len(messages),
+                        messages=[m.text for m in messages],
+                        note=VOICE_NOTE if messages else "",
+                    )
                 time.sleep(0.5)

@@ -17,6 +17,11 @@ from pathlib import Path
 from voxar.domain import VoxarError
 
 MAX_MESSAGE_CHARS = 2000
+CUT_OFF = " [message cut off]"
+VOICE_NOTE = (
+    "The user said this by voice (transcribed automatically, so words may be wrong; confirm "
+    "anything risky out loud before doing it)."
+)
 _LOCK_WAIT_S = 2.0
 _STALE_LOCK_S = 10.0
 _COMPACT_BYTES = 1 << 20
@@ -42,7 +47,8 @@ class Inbox:
         body = text.strip()
         if not body:
             raise ValueError("a spoken message must not be empty")
-        body = body[:MAX_MESSAGE_CHARS]
+        if len(body) > MAX_MESSAGE_CHARS:
+            body = body[:MAX_MESSAGE_CHARS] + CUT_OFF  # never drop words without saying so
         with self._locked():
             number = self._count() + 1
             message = Message(
@@ -138,7 +144,4 @@ def describe(messages: list[Message]) -> str:
     if not messages:
         return "(no new voice messages)"
     lines = [f"{i}. {m.text}" for i, m in enumerate(messages, 1)]
-    return (
-        "The user said, by voice (transcribed automatically, so words may be wrong; confirm "
-        "anything risky out loud before doing it):\n" + "\n".join(lines)
-    )
+    return VOICE_NOTE.removesuffix(".") + ":\n" + "\n".join(lines)

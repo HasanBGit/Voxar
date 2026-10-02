@@ -21,7 +21,7 @@ pytest.importorskip("httpx2")
 from fastapi.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
-from voxar.server import create_app  # noqa: E402
+from voxar.server import _same_secret, create_app  # noqa: E402
 
 
 def make_client(
@@ -31,6 +31,7 @@ def make_client(
     max_upload_bytes: int = 1_000_000,
     max_stream_seconds: float = 60.0,
     max_streams: int = 4,
+    token: str | None = None,
 ) -> TestClient:
     app = Voxar(
         recognizer=FakeRecognizer() if recognizer else None,
@@ -43,6 +44,7 @@ def make_client(
         max_upload_bytes=max_upload_bytes,
         max_stream_seconds=max_stream_seconds,
         max_streams=max_streams,
+        token=token,
     )
     return TestClient(api, base_url="http://localhost:8765")
 
@@ -142,6 +144,8 @@ def test_websocket_streams_partial_and_final_events() -> None:
         ("part1", False),
         ("line1:3200", True),
     ]
+    assert {e["type"] for e in events} == {"transcript"}
+    assert [e["segment"] for e in events] == [0, 0, 1, 1]  # a final line closes its segment
 
 
 def test_websocket_rejects_foreign_origins() -> None:
@@ -187,6 +191,7 @@ def test_websocket_enforces_a_session_length_limit() -> None:
             except WebSocketDisconnect:
                 break
     assert any("error" in m and "too long" in m["error"] for m in messages)
+    assert all(m["type"] == "error" for m in messages if "error" in m)
 
 
 def test_explicit_remote_mode_accepts_any_host() -> None:
@@ -376,3 +381,61 @@ def test_the_page_can_switch_language_and_theme() -> None:
         'prefs.set("lang"',
     ):
         assert expected in html
+
+
+TOKEN = "s3cret-token-value"  # noqa: S105 (a test value)
+
+
+def test_without_a_token_configured_nothing_asks_for_one() -> None:
+    assert make_client().get("/health").status_code == 200
+
+
+@pytest.mark.parametrize("path", ["/health", "/"])
+def test_a_token_protected_server_refuses_requests_without_it(path: str) -> None:
+    response = make_client(token=TOKEN).get(path)
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+
+
+def test_a_wrong_token_is_refused_in_every_form() -> None:
+    client = make_client(token=TOKEN)
+    assert client.get("/health", headers={"authorization": "Bearer nope"}).status_code == 401
+    assert client.get("/health", headers={"authorization": f"Basic {TOKEN}"}).status_code == 401
+    assert client.get("/?token=nope").status_code == 401
+    assert not _same_secret("\u00e9", TOKEN)  # non-ASCII input is a mismatch, not a crash
+
+
+def test_a_bearer_token_opens_the_api() -> None:
+    client = make_client(token=TOKEN)
+    ok = client.get("/health", headers={"authorization": f"Bearer {TOKEN}"})
+    assert ok.status_code == 200
+
+
+def test_opening_the_link_sets_a_strict_cookie_that_then_works_everywhere() -> None:
+    client = make_client(token=TOKEN)
+    page = client.get(f"/?token={TOKEN}")
+    assert page.status_code == 200
+    cookie = page.headers["set-cookie"].lower()
+    assert "httponly" in cookie and "samesite=strict" in cookie
+    assert client.get("/health").status_code == 200  # the client kept the cookie
+    with connect(client, cookie=f"voxar_token={TOKEN}") as ws:  # a browser sends it on the stream
+        ws.send_text("end")
+        collect(ws)
+
+
+def test_the_live_stream_refuses_a_connection_without_the_token() -> None:
+    client = make_client(token=TOKEN)
+    with pytest.raises(WebSocketDisconnect) as refused, connect(client):
+        pass
+    assert refused.value.code == 1008
+    with connect(client, authorization=f"Bearer {TOKEN}") as ws:
+        ws.send_text("end")
+        collect(ws)
+
+
+def test_the_token_does_not_replace_the_host_check() -> None:
+    client = make_client(token=TOKEN)
+    response = client.get(
+        "/health", headers={"host": "evil.example", "authorization": f"Bearer {TOKEN}"}
+    )
+    assert response.status_code == 403

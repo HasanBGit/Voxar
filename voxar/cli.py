@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import platform
+import secrets
 import sys
 import threading
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -21,15 +22,20 @@ from voxar.mic import mic_chunks
 from voxar.models import CATALOG, Fetcher, ModelSpec, ModelStore
 from voxar.net import fetcher_for as https_fetcher_for
 from voxar.registry import Registry
-from voxar.voice import Player, VoiceIO, play_audio, record_utterance
+from voxar.vad import detector_factory
+from voxar.voice import Player, VoiceIO, play_audio, record_utterance, speak_aloud
 
 EXIT_OK = 0
 EXIT_ERROR = 2
 
 FetcherFactory = Callable[[ModelSpec], Fetcher]
 MicSource = Callable[[], Iterable[AudioChunk]]
-ServeMcp = Callable[[Voxar, Sequence[Path], Callable[[], dict[str, list[str]]], bool, Path], None]
-ServeHttp = Callable[[Voxar, Callable[[], dict[str, list[str]]], str, int, bool, bool], None]
+ServeMcp = Callable[
+    [Voxar, Sequence[Path], Callable[[], dict[str, list[str]]], bool, Path, Config], None
+]
+ServeHttp = Callable[
+    [Voxar, Callable[[], dict[str, list[str]]], str, int, bool, bool, str | None], None
+]
 LlmFactory = Callable[..., ChatClient]
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
@@ -58,11 +64,16 @@ def _serve_mcp(
     engines: Callable[[], dict[str, list[str]]],
     voice: bool,
     inbox_dir: Path,
+    config: Config,
 ) -> None:
     try:
         from voxar.mcp_server import build_server
 
-        devices = VoiceIO(play=play_audio, listen_chunks=mic_chunks) if voice else None
+        devices = (
+            VoiceIO(play=play_audio, listen_chunks=mic_chunks, speech_test=detector_factory(config))
+            if voice
+            else None
+        )
         inbox = Inbox(inbox_dir) if voice else None
         server = build_server(app, allowed, engines, devices, inbox)
     except ImportError as exc:
@@ -93,6 +104,7 @@ def _serve_http(
     port: int,
     allow_remote: bool,
     warm: bool,
+    token: str | None,
 ) -> None:
     try:
         import uvicorn
@@ -105,7 +117,8 @@ def _serve_http(
     allowed = frozenset({ANY_HOST}) if allow_remote else LOOPBACK_NAMES
     if warm:
         _warm_in_background(app)
-    uvicorn.run(create_app(app, engines, allowed_hosts=allowed), host=host, port=port)
+    api = create_app(app, engines, allowed_hosts=allowed, token=token)
+    uvicorn.run(api, host=host, port=port)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -277,29 +290,44 @@ def _say(args: argparse.Namespace, ctx: _Context) -> None:
     if args.output:
         app.speak_to_file(args.text, args.output, voice=args.voice)
     else:
-        ctx.play(app.speak(args.text, voice=args.voice))
+        speak_aloud(lambda part: app.speak(part, voice=args.voice), ctx.play, args.text)
 
 
 def _mcp(args: argparse.Namespace, ctx: _Context) -> None:
     allowed = [Path(d) for d in args.allow_dir] if args.allow_dir else [Path.cwd()]
     app = Voxar.from_config(ctx.config, ctx.registry)
     inbox_dir = ctx.config.cache_dir / "inbox"
-    ctx.serve_mcp(app, allowed, ctx.registry.available, args.voice, inbox_dir)
+    if args.voice:
+        _warm_in_background(app)  # the first spoken update should not wait for the voice to load
+    ctx.serve_mcp(app, allowed, ctx.registry.available, args.voice, inbox_dir, ctx.config)
 
 
 def _serve(args: argparse.Namespace, ctx: _Context) -> None:
     if args.host not in LOOPBACK_HOSTS and not args.allow_remote:
         raise ValueError(
-            f"refusing to listen on {args.host}: the server has no authentication. "
+            f"refusing to listen on {args.host}: reachable from a network, the server would be "
+            "protected only by a token and has no HTTPS. "
             "Use 127.0.0.1, or pass --allow-remote if you understand the risk"
         )
     app = Voxar.from_config(ctx.config, ctx.registry)
+    token = secrets.token_urlsafe(24) if args.allow_remote else None  # new on every start
+    suffix = f"/?token={token}" if token else ""
     print(
-        f"voxar on http://{args.host}:{args.port}  (open it in a browser; Ctrl-C to stop)",
+        f"voxar on http://{args.host}:{args.port}{suffix}  (open it in a browser; Ctrl-C to stop)",
         file=sys.stderr,
     )
+    if token:
+        print(
+            "exposed to the network: every request needs that token (plain HTTP)", file=sys.stderr
+        )
     ctx.serve_http(
-        app, ctx.registry.available, args.host, args.port, args.allow_remote, not args.no_warm
+        app,
+        ctx.registry.available,
+        args.host,
+        args.port,
+        args.allow_remote,
+        not args.no_warm,
+        token,
     )
 
 
@@ -376,6 +404,7 @@ def _inbox(args: argparse.Namespace, ctx: _Context) -> None:
 
 def _inbox_listen(args: argparse.Namespace, ctx: _Context, inbox: Inbox) -> None:
     app = Voxar.from_config(ctx.config, ctx.registry)
+    speech_test = detector_factory(ctx.config)
     if args.always_on:
         print(
             "always-on: everything the microphone hears becomes an instruction for your agent"
@@ -389,7 +418,10 @@ def _inbox_listen(args: argparse.Namespace, ctx: _Context, inbox: Inbox) -> None
                 if not ctx.stdin.readline():
                     return
             audio = record_utterance(
-                ctx.mic(), max_seconds=args.max_seconds, silence_seconds=args.silence
+                ctx.mic(),
+                max_seconds=args.max_seconds,
+                silence_seconds=args.silence,
+                is_speech=speech_test() if speech_test else None,
             )
             text = app.transcribe_audio(audio).strip() if audio else ""
             if args.wake:
@@ -449,3 +481,4 @@ def _doctor(ctx: _Context) -> None:
     print(f"offline: {config.offline}", file=ctx.out)
     print(f"recognizers: {', '.join(engines['recognizers']) or 'none'}", file=ctx.out)
     print(f"synthesizers: {', '.join(engines['synthesizers']) or 'none'}", file=ctx.out)
+    print(f"voice detection: {'silero' if detector_factory(config) else 'volume'}", file=ctx.out)

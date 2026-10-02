@@ -88,6 +88,7 @@ cache dir: ~/.cache/voxar (exists: True)
 offline: False
 recognizers: moonshine
 synthesizers: nabra-saudi
+voice detection: volume
 
 $ voxar transcribe sample.wav
 السلام عليكم ورحمة الله وبركاته كيف نحالك اليوم
@@ -126,34 +127,7 @@ $ voxar transcribe hello16k.wav
 
 ## أمثلة
 
-ثمانية سكربتات قابلة للتشغيل في [`examples/`](../../examples/README.md)، جُرّب كل منها على النماذج الحقيقية: واجهة بايثون، والبث بنمط الوقت الحقيقي، وتحويل النص إلى كلام، وعميل HTTP ينتظر ويعيد المحاولة عند `503`، وعميل WebSocket، وعميل MCP، ونسخ مجلد كامل دفعة واحدة، ورحلة «قول ثم نسخ».
-
-</div>
-
-```bash
-uv run python examples/01_transcribe_file.py sample.wav
-uv run python examples/02_stream_from_wav.py sample.wav
-uv run python examples/07_batch_transcribe.py recordings/ transcripts.jsonl
-```
-
-<div dir="rtl">
-
-مخرجات حقيقية (صوت عربي اصطناعي):
-
-</div>
-
-```text
-$ uv run python examples/02_stream_from_wav.py greeting.wav
-partial السلام عليكم
-partial السلام علي
-partial السلام عليكم ورحمة الله
-partial السلام عليكم ورحمة الله وبركاته
-final   السلام عليكم ورحمة الله وبركاته
-```
-
-<div dir="rtl">
-
-النص الجزئي (`partial`) قد يتغيّر (لاحظ تعديل «السلام علي»)، أما السطر النهائي (`final`) فلا يتغيّر أبدًا.
+ثمانية سكربتات قابلة للتشغيل في [`examples/`](../../examples/README.md)، جُرّب كل منها على النماذج الحقيقية: واجهة بايثون، والبث بنمط الوقت الحقيقي، وتحويل النص إلى كلام، وعملاء HTTP وWebSocket وMCP، ونسخ مجلد كامل دفعة واحدة، ورحلة «قول ثم نسخ».
 
 ---
 
@@ -171,15 +145,6 @@ final   السلام عليكم ورحمة الله وبركاته
 | الحِمل الزائد | بعد 9 طلبات في الطابور يردّ الخادم فورًا بـ `503` بدل إبطاء الجميع |
 | البث الحي | أول نص بعد نحو ثانية من بدء الكلام؛ والنص النهائي خلال 0.2 ثانية من النهاية؛ و4 تدفقات معًا |
 | الدقة (صوت اصطناعي فقط) | 8 جمل بالفصحى: WER 4.1٪ وCER 0.7٪. و4 جمل بصياغة لهجية يقرؤها صوت فصيح: WER 29٪ وCER 5٪ |
-
-</div>
-
-```bash
-uv run python scripts/benchmark.py asr clips/*.wav --refs refs.json --repeat 3   # speed, memory, WER/CER
-uv run python scripts/loadtest.py http --file clip.wav --concurrency 8 --requests 32   # with `voxar serve` running
-```
-
-<div dir="rtl">
 
 ---
 
@@ -239,7 +204,7 @@ uv run voxar serve                      # http://127.0.0.1:8765
 
 <div dir="rtl">
 
-> **لا تعرّض هذا الخادم لشبكة لا تثق بها.** ليس فيه مصادقة ولا HTTPS. وهو يرفض أي عنوان غير `127.0.0.1` ما لم تمرّر `--allow-remote`.
+> **لا تعرّض هذا الخادم لشبكة لا تثق بها.** لا مصادقة عليه على الجهاز نفسه، وليس فيه HTTPS. وهو يرفض أي عنوان غير `127.0.0.1` ما لم تمرّر `--allow-remote`، وعندها يطلب رمزًا عشوائيًا يُطبع في رابط عند التشغيل، لكن يبقى الرمز مكشوفًا لمن يراقب الشبكة.
 
 **صفحة اختبار في المتصفح** (بواجهة عربية أو إنجليزية يمكنك التبديل بينها، ومظهر فاتح أو داكن، وتحكّم في حجم النص): يقدّم `voxar serve` صفحة اختبار صغيرة على عنوانه نفسه. افتح **http://127.0.0.1:8765** لترفع ملفًا صوتيًا فترى النص، أو لتكتب نصًا فتسمعه بالصوت السعودي. كل شيء يعمل على جهازك. وفيها لوحتان: **Listen** (أسقِط ملفًا صوتيًا فيُنسخ في ثوانٍ، أو فعّل «Play the file as live» ليُبَثّ بسرعة الكلام فيظهر النص أثناء التشغيل: الرمادي ما زال يتغيّر والأسود نهائي) و**Speak** (اكتب نصًا أو اضغط إحدى ثلاث جمل جاهزة).
 

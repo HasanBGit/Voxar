@@ -8,7 +8,7 @@ import pytest
 
 import voxar.inbox as inbox_module
 from voxar.domain import VoxarError
-from voxar.inbox import MAX_MESSAGE_CHARS, Inbox, describe
+from voxar.inbox import CUT_OFF, MAX_MESSAGE_CHARS, Inbox, describe
 
 
 def test_a_message_is_delivered_once_in_order(tmp_path: Path) -> None:
@@ -42,7 +42,9 @@ def test_empty_messages_are_refused_and_long_ones_cut(tmp_path: Path) -> None:
     inbox = Inbox(tmp_path)
     with pytest.raises(ValueError, match="empty"):
         inbox.add("   ")
-    assert len(inbox.add("x" * (MAX_MESSAGE_CHARS + 50)).text) == MAX_MESSAGE_CHARS
+    cut = inbox.add("x" * (MAX_MESSAGE_CHARS + 50)).text
+    assert cut == "x" * MAX_MESSAGE_CHARS + CUT_OFF  # the agent is told words are missing
+    assert inbox.add("x" * MAX_MESSAGE_CHARS).text == "x" * MAX_MESSAGE_CHARS
 
 
 def test_clear_removes_everything(tmp_path: Path) -> None:

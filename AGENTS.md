@@ -8,10 +8,10 @@ Instructions for coding agents working in this repo.
 - Architecture rules are in `ARCHITECTURE.md` and `docs/adr/`: depend on ports, lazy-import third-party engines, fail fast with actionable errors.
 - License rules are strict: read `THIRD_PARTY_LICENSES.md` and `DATA.md` before adding any model, code or data. Do not use components listed under "Deliberately NOT used".
 - Do not invent accuracy/speed numbers or claim features that are not implemented.
-- Layout: `voxar/` (package; MCP server is `voxar/mcp_server.py`, HTTP server `voxar/server.py`), `tests/`, `scripts/`, `plugins/`, `examples/`, `docs/`; `export/`, `sdk/` and `training/` are placeholders (nothing implemented).
+- Layout: `voxar/` (package; MCP server is `voxar/mcp_server.py`, HTTP server `voxar/server.py`), `tests/`, `scripts/`, `plugins/`, `examples/`, `docs/`.
 - Python >= 3.10.
 - The plugin's vendored code in `plugins/voxar-tts-espeak/src/voxar_tts_espeak/_vendor/` is third-party: do not reformat or edit it. If a change is unavoidable, update its `MODIFIED` header, `MANIFEST.md` and `UPSTREAM.md` (a test checks the hashes).
 - When driving a browser over the DevTools protocol, pick a free port (bind to port 0) and confirm it is yours before sending anything: a fixed port can belong to someone else's browser.
 - The core must never import the plugin or any GPL package (CI enforces the license audit).
 - MCP rule: stdout is the protocol channel in `voxar mcp`; never print there (logs go to stderr). Any new MCP tool that touches files must go through `resolve_inside`.
-- Server rule: keep the Host/Origin guard and the size limits; do not add authentication-less remote defaults.
+- Server rule: keep the Host/Origin guard and the size limits; do not add authentication-less remote defaults (exposed mode requires the token).

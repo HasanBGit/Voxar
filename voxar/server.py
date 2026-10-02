@@ -1,13 +1,17 @@
 """Optional local HTTP/WebSocket server (extra: ``voxar[server]``). Thin: calls the facade.
 
-Meant for a browser or phone app on the same machine. It has NO authentication, so it binds to
-loopback by default and defends against the one attack a local server must expect from a web
-page: DNS rebinding. Requests whose ``Host`` is not a loopback name, and WebSocket upgrades whose
-``Origin`` is not a local page, are rejected. Upload size and stream length are capped.
+Meant for a browser or phone app on the same machine. On loopback it has no authentication and
+defends against the one attack a local server must expect from a web page: DNS rebinding.
+Requests whose ``Host`` is not a loopback name, and WebSocket upgrades whose ``Origin`` is not a
+local page, are rejected. Upload size and stream length are capped. When the server is exposed
+(``--allow-remote``) those host checks are off, so a random token is required instead: as
+``Authorization: Bearer`` or in a SameSite=Strict cookie that opening ``/?token=...`` sets. There
+is no HTTPS, so the token protects against other people on the network, not against sniffing.
 """
 
 import asyncio
 import contextlib
+import hmac
 import json
 import queue
 import threading
@@ -47,6 +51,21 @@ def _host_allowed(host_header: str, allowed: frozenset[str]) -> bool:
 
 def _origin_allowed(origin: str, allowed: frozenset[str]) -> bool:
     return ANY_HOST in allowed or (urlsplit(origin).hostname or "").lower() in allowed
+
+
+TOKEN_COOKIE = "voxar_token"  # noqa: S105 (a cookie name, not a secret)
+
+
+def _same_secret(given: str, expected: str) -> bool:
+    return hmac.compare_digest(given.encode(), expected.encode())
+
+
+def _has_token(headers: Any, cookies: Any, token: str) -> bool:
+    """Whether the request carries the server's token as a Bearer header or as the cookie."""
+    scheme, _, bearer = headers.get("authorization", "").partition(" ")
+    if scheme.lower() == "bearer" and _same_secret(bearer.strip(), token):
+        return True
+    return _same_secret(cookies.get(TOKEN_COOKIE, ""), token)
 
 
 def _status_for(error: Exception) -> int:
@@ -94,11 +113,14 @@ def create_app(
     max_stream_seconds: float = 3600.0,
     max_streams: int = 4,
     max_waiting: int = 8,
+    token: str | None = None,
 ) -> "FastAPI":
     from fastapi import FastAPI
 
     api = FastAPI(title="voxar", version=voxar.__version__, docs_url=None, redoc_url=None)
     _install_host_guard(api, allowed_hosts)
+    if token:
+        _install_token_guard(api, token)
     _install_error_handlers(api)
     _install_http_routes(
         api,
@@ -110,7 +132,12 @@ def create_app(
     )
     _install_ui_route(api)
     _install_stream_route(
-        api, app, allowed_hosts, max_stream_seconds=max_stream_seconds, max_streams=max_streams
+        api,
+        app,
+        allowed_hosts,
+        max_stream_seconds=max_stream_seconds,
+        max_streams=max_streams,
+        token=token,
     )
     return api
 
@@ -124,6 +151,25 @@ def _install_host_guard(api: "FastAPI", allowed_hosts: frozenset[str]) -> None:
         if not _host_allowed(request.headers.get("host", ""), allowed_hosts):
             return JSONResponse({"error": "host not allowed"}, status_code=403)
         return await call_next(request)  # type: ignore[no-any-return]
+
+
+def _install_token_guard(api: "FastAPI", token: str) -> None:
+    from fastapi import Request, Response
+    from fastapi.responses import JSONResponse
+
+    @api.middleware("http")
+    async def require_token(request: Request, call_next: Any) -> Response:
+        if _has_token(request.headers, request.cookies, token):
+            return await call_next(request)  # type: ignore[no-any-return]
+        if request.url.path == "/" and _same_secret(request.query_params.get("token", ""), token):
+            page: Response = await call_next(request)
+            page.set_cookie(TOKEN_COOKIE, token, httponly=True, samesite="strict")
+            return page
+        return JSONResponse(
+            {"error": "missing or wrong token: open the URL that voxar serve printed"},
+            status_code=401,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 def _install_error_handlers(api: "FastAPI") -> None:
@@ -227,6 +273,7 @@ def _install_stream_route(
     *,
     max_stream_seconds: float,
     max_streams: int,
+    token: str | None,
 ) -> None:
     from fastapi import WebSocket
 
@@ -239,11 +286,16 @@ def _install_stream_route(
         if not host_ok or (origin is not None and not _origin_allowed(origin, allowed_hosts)):
             await ws.close(code=1008)
             return
+        if token and not _has_token(ws.headers, ws.cookies, token):
+            await ws.close(code=1008)  # the client sees a refused handshake, like a bad Host
+            return
         await ws.accept()
         if not streams.acquire(blocking=False):
             # Accept first: closing before the handshake completes reaches a real client as a
             # bare HTTP 403, indistinguishable from the Host/Origin rejection above.
-            await ws.send_text(json.dumps({"error": "too many live streams, try again shortly"}))
+            await ws.send_text(
+                json.dumps({"type": "error", "error": "too many live streams, try again shortly"})
+            )
             await ws.close(code=1013)  # "try again later"
             return
         try:
@@ -279,6 +331,7 @@ class _Stream:
         self._incoming: queue.Queue[object] = queue.Queue(maxsize=200)
         self._outgoing: asyncio.Queue[object] = asyncio.Queue()
         self._received_seconds = 0.0
+        self._segment = 0  # the line being spoken; it advances when a final line closes it
 
     async def run(self) -> None:
         worker = threading.Thread(target=self._recognize, daemon=True)
@@ -287,7 +340,7 @@ class _Stream:
         try:
             await self._receive_frames()
         except (VoxarError, ValueError) as exc:
-            await self._ws.send_text(json.dumps({"error": str(exc)}))
+            await self._ws.send_text(json.dumps({"type": "error", "error": str(exc)}))
         finally:
             self._incoming.put(_STOP)
             await asyncio.to_thread(worker.join)
@@ -313,9 +366,18 @@ class _Stream:
     def _recognize(self) -> None:
         try:
             for event in self._app.stream(self._chunks()):
-                self._emit({"text": event.text, "final": event.is_final})
+                self._emit(
+                    {
+                        "type": "transcript",
+                        "text": event.text,
+                        "final": event.is_final,
+                        "segment": self._segment,
+                    }
+                )
+                if event.is_final:
+                    self._segment += 1
         except (VoxarError, ValueError) as exc:
-            self._emit({"error": str(exc)})
+            self._emit({"type": "error", "error": str(exc)})
         finally:
             self._emit(_STOP)
 

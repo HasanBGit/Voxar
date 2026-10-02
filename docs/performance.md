@@ -83,6 +83,36 @@ Text-to-speech through the server: 5.4 to 6.7 req/s for a one-sentence request, 
 4. **A native warning on every start is hidden.** Moonshine's C++ tokenizer printed a harmless notice to stderr on each run. It is held back during model load and shown only if loading fails.
 5. **A full WebSocket server answers explicitly.** A refusal at capacity would look like a bare HTTP 403, the same as a security rejection, so the server accepts, sends an explanatory message and closes with 1013.
 
+## Ending a phrase: volume gate versus Silero
+
+How well `listen`, `ask` and `inbox listen` find the end of a phrase, measured with `scripts/turntaking.py` on the Apple M4 above. Four synthetic clips (macOS Arabic voice "Majed", 1 to 6 s long) are placed after 1 s of white noise and followed by 4 s of noise. The silence setting is 1.0 s. Each condition ran 3 times per clip (12 runs), plus 3 runs of noise with no speech at all.
+
+| Noise (RMS of 32767) | Detector | Missed | Cut early | End delay (median) | False start |
+|---|---|---|---|---|---|
+| 0 | volume | 0/12 | 0/12 | 0.96 s | 0/3 |
+| 0 | Silero | 0/12 | 0/12 | 1.06 s | 0/3 |
+| 200 | volume | 0/12 | 0/12 | 0.96 s | 0/3 |
+| 200 | Silero | 0/12 | 0/12 | 1.06 s | 0/3 |
+| 800 | volume | 0/12 | 0/12 | 4.06 s | 3/3 |
+| 800 | Silero | 0/12 | 0/12 | 1.07 s | 0/3 |
+| 1500 | volume | 0/12 | 0/12 | 4.06 s | 3/3 |
+| 1500 | Silero | 0/12 | 0/12 | 1.13 s | 0/3 |
+
+Reading it: in a quiet room the two are equivalent (Silero ends about 0.1 s later). Once steady noise passes the volume gate's fixed level, the gate takes the noise for speech: it never sees silence, so capture runs until the stream ends (4.06 s after the speech) and noise alone "finds a phrase" every time. Silero still ends within 0.1 s of the silence setting. The end delay is the time from the end of the clip to the end of capture; it can sit slightly under the silence setting because the clips end in a quiet tail.
+
+Limits: one synthetic voice, white noise (not a street, a fan or other voices), clean speech with no overlapping speakers, and no real microphone. This shows the logic works and where the volume gate breaks. It does not say how either detector behaves for real people in real rooms.
+
+## Speaking a long message
+
+`announce`, `ask` and `voxar say` play one sentence while the next is synthesized. First-sound time with the Saudi voice on the Apple M4 above (median of 5 runs, voice already loaded, a stand-in player that returns at once):
+
+| Message | Before (all synthesized first) | Now (first sentence only) |
+|---|---|---|
+| 4 sentences, 174 characters | 0.83 s | 0.24 s |
+| 1 sentence, 47 characters | 0.25 s | 0.24 s |
+
+A one-sentence message gains nothing. Run-to-run variation is real (an earlier run of the same 4-sentence message took 0.50 s the old way), so read the table as "a few tenths of a second saved on multi-sentence messages", not as precise figures. Separately, loading the voice takes about 3.8 s on its first use, which `voxar mcp --voice` now pays at start-up.
+
 ## Reproduce it
 
 ```bash
@@ -94,10 +124,13 @@ VOXAR_SYNTHESIZER=nabra-saudi python scripts/benchmark.py tts "مرحبا" "يا
 uv run python scripts/loadtest.py http  --file clip.wav --concurrency 8 --requests 32
 uv run python scripts/loadtest.py ws    --file clip.wav --streams 6 --realtime
 uv run python scripts/loadtest.py speak --text "مرحبا" --concurrency 4 --requests 24
+
+# ending a phrase, volume gate vs Silero (Silero needs `uv sync --extra vad` and `voxar models pull silero-vad`)
+uv run python scripts/turntaking.py clips/*.wav --noise 0 200 800 1500 --silence 1.0 --repeat 3
 ```
 
 `refs.json` maps a clip's file stem to its reference text. The scripts print the machine they ran on.
 
 ## Not measured
 
-Real human speech and any dialect corpus; accuracy on noisy audio or phone calls; the live microphone path; GPU or other CPUs; memory growth over hours; the server under network latency; more than one voice.
+Real human speech and any dialect corpus; accuracy on noisy audio or phone calls; the live microphone path (the table above feeds recorded audio through the same code); GPU or other CPUs; memory growth over hours; the server under network latency; more than one voice.

@@ -44,7 +44,7 @@ make run       # then open http://127.0.0.1:8765
 
 No `make` (for example on Windows)? Run the commands inside the [`Makefile`](Makefile) by hand: `uv sync --extra moonshine --extra mcp --extra server` and `uv run voxar models pull moonshine-tiny-streaming-ar --accept-license`.
 
-Or transcribe from the command line, with a 16 kHz mono 16-bit WAV file:
+Or transcribe from the command line, with a 16 kHz mono 16-bit WAV file (convert anything else with `ffmpeg -i input.m4a -ar 16000 -ac 1 -sample_fmt s16 sample.wav`):
 
 ```bash
 uv run voxar transcribe sample.wav
@@ -74,6 +74,7 @@ cache dir: ~/.cache/voxar (exists: True)
 offline: False
 recognizers: moonshine
 synthesizers: nabra-saudi
+voice detection: volume
 
 $ voxar transcribe sample.wav
 السلام عليكم ورحمة الله وبركاته كيف نحالك اليوم
@@ -90,21 +91,7 @@ $ voxar transcribe hello16k.wav
 يا أهلا وسهلا كيف حالكم إن شاء الله طيبين وبأحسن حال
 ```
 
-Live streaming over the WebSocket endpoint (`voxar serve`), partial text growing until the final line:
-
-```text
-event: {'text': 'السلام عليكم', 'final': False}
-event: {'text': 'السلام عليكم ورحمة الله', 'final': False}
-event: {'text': 'السلام عليكم ورحمة الله وبركاته كيف', 'final': False}
-event: {'text': 'السلام عليكم ورحمة الله وبركاته كيف نحالك اليوم', 'final': True}
-```
-
-Errors are one readable line with the fix, never a traceback:
-
-```text
-$ voxar transcribe stereo.wav
-error: audio must be mono (got 2 channels); convert with: ffmpeg -i INPUT -ar 16000 -ac 1 -sample_fmt s16 OUTPUT.wav
-```
+Errors are one readable line with the fix, never a traceback. Eight runnable scripts (Python API, live-style streaming, HTTP, WebSocket and MCP clients, batch transcription) with their output are in [`examples/`](examples/README.md).
 
 ---
 
@@ -114,37 +101,11 @@ error: audio must be mono (got 2 channels); convert with: ffmpeg -i INPUT -ar 16
 |---|---|
 | **Speech-to-text from a file** | `voxar transcribe` returns the final text (Moonshine streaming Arabic) |
 | **Saudi-dialect text-to-speech** | `voxar say` writes a 24 kHz WAV, one female voice, through an optional **GPL-3.0** plugin that needs torch |
-| **MCP server for agents** | `transcribe_file`, `speak`, `list_engines` over stdio; file access confined to allowed directories. With `--voice`, also `announce`, `listen` and `ask`, so an agent such as Claude Code or Codex can speak a status update or hear you ([guide](docs/agents-mcp.md)) |
-| **Language models** | `voxar llm ask/models/providers`: HUMAIN Node (default), OpenRouter, OpenAI, Anthropic, Groq, Together, Mistral, Gemini, Ollama, LM Studio or any compatible server |
-| **Local HTTP/WebSocket server** | `POST /v1/transcribe`, `POST /v1/speak`, live `WS /v1/stream` |
-| **Browser test page** | `voxar serve` serves a page at `/` to upload audio, stream it live, and type text to hear it |
+| **MCP server for agents** | `transcribe_file`, `speak`, `list_engines` over stdio, with file access confined to allowed directories. With `--voice`, an agent such as Claude Code or Codex can also speak a status update or hear you ([guide](docs/agents-mcp.md)) |
+| **Language models** | `voxar llm`: HUMAIN Node (default), OpenRouter, OpenAI, Anthropic, Groq, Together, Mistral, Gemini, Ollama, LM Studio or any compatible server ([guide](docs/llm.md)) |
+| **Local HTTP/WebSocket server** | `POST /v1/transcribe`, `POST /v1/speak`, live `WS /v1/stream`, plus a browser test page at `/` |
 | **Verified model downloads** | `voxar models pull/verify`: HTTPS only, pinned SHA-256, atomic install |
 | **Engines as plugins** | Add an engine by registering an entry point; the core never imports it |
-
----
-
-## Examples
-
-Eight runnable scripts in [`examples/`](examples/README.md), each tested against the real models: the Python API, live-style streaming, text-to-speech, an HTTP client that backs off on `503`, a WebSocket client, an MCP client, folder batch transcription, and a speak-then-transcribe round trip.
-
-```bash
-uv run python examples/01_transcribe_file.py sample.wav
-uv run python examples/02_stream_from_wav.py sample.wav
-uv run python examples/07_batch_transcribe.py recordings/ transcripts.jsonl
-```
-
-Real output (synthetic Arabic audio):
-
-```text
-$ uv run python examples/02_stream_from_wav.py greeting.wav
-partial السلام عليكم
-partial السلام علي
-partial السلام عليكم ورحمة الله
-partial السلام عليكم ورحمة الله وبركاته
-final   السلام عليكم ورحمة الله وبركاته
-```
-
-Partial text can still change (note "السلام علي" being revised); a final line never does. All eight scripts, with more output, are in [`examples/README.md`](examples/README.md).
 
 ---
 
@@ -163,28 +124,11 @@ Apple M4 laptop, 10 cores, 16 GB, CPU only. Your numbers will differ; the method
 | Live streams | first text about 1 s after speech starts; final text within 0.2 s of the end; 4 streams at once |
 | Accuracy (synthetic audio only) | 8 MSA sentences: WER 4.1 %, CER 0.7 %. 4 dialect-worded sentences read by an MSA voice: WER 29 %, CER 5 % |
 
-```bash
-uv run python scripts/benchmark.py asr clips/*.wav --refs refs.json --repeat 3   # speed, memory, WER/CER
-uv run python scripts/loadtest.py http --file clip.wav --concurrency 8 --requests 32   # with `voxar serve` running
-```
-
----
-
-## Prerequisites
-
-| Requirement | Minimum | Check | Install |
-|---|---|---|---|
-| Python | 3.10+ | `python --version` | [python.org](https://www.python.org/downloads/) |
-| uv *(recommended)* | any | `uv --version` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| ffmpeg *(to convert audio)* | any | `ffmpeg -version` | `brew install ffmpeg` / `sudo apt install ffmpeg` |
-
-voxar reads **16 kHz mono 16-bit WAV** only. Anything else is rejected with the `ffmpeg` command that converts it.
-
 ---
 
 ## Install
 
-Install from the project folder. The core has no dependencies; engines and servers are optional extras:
+Install from the project folder. The core has no dependencies; engines and servers are optional extras. voxar reads **16 kHz mono 16-bit WAV** only; anything else is rejected with the `ffmpeg` command that converts it (install ffmpeg with `brew install ffmpeg` or `sudo apt install ffmpeg`).
 
 ```bash
 uv sync                                  # core only
@@ -197,6 +141,7 @@ uv sync --extra moonshine --extra mcp --extra server   # + MCP server and local 
 | `moonshine` | The Arabic speech-to-text engine (`moonshine-voice`, MIT) |
 | `mcp` | `voxar mcp`, the MCP server for agents (`mcp`, MIT) |
 | `server` | `voxar serve`, the local HTTP/WebSocket server (`fastapi`, `uvicorn`, `websockets`) |
+| `vad` | Neural voice detection for `listen`, `ask` and the voice inbox (`onnxruntime`, MIT); also run `voxar models pull silero-vad --accept-license` (~2 MB) |
 | `dev` | Linters, type checker, tests, audit tools |
 
 **Text-to-speech is a separate package** with a different license (GPL-3.0). It needs torch and transformers (a venv of roughly 900 MB):
@@ -233,19 +178,7 @@ uv run voxar mcp --allow-dir ./audio
 }
 ```
 
-| Tool | Arguments | Result |
-|---|---|---|
-| `transcribe_file` | `path` | the transcript |
-| `speak` | `text`, `output_path`, optional `voice`, optional `overwrite` | where the WAV was written and its length |
-| `list_engines` | none | installed recognizers and synthesizers |
-| `announce` (`--voice`) | `message` | speaks a short status update on the speakers |
-| `listen` (`--voice`) | optional `max_seconds`, `silence_seconds` | what you said, as text |
-| `ask` (`--voice`) | `question` | speaks the question, then returns your spoken answer |
-| `check_voice_inbox` (`--voice`) | optional `wait_seconds` | what you said from another window with `voxar inbox listen` |
-
-The voice tools exist only when the server starts with `--voice`: `uv run voxar mcp --voice`. To give a running agent tasks by voice from a second window, run `uv run voxar inbox listen` there (press Enter, speak). Setup for Claude Code and Codex, the hooks, and the safety notes are in [docs/agents-mcp.md](docs/agents-mcp.md).
-
-An agent controls every argument, so file paths must resolve **inside an allowed directory** (default: the working directory; `..` and symlinks cannot escape), `speak` never overwrites a file unless `overwrite=true`, and only WAV audio is read.
+An agent controls every argument, so file paths must resolve **inside an allowed directory** (default: the working directory; `..` and symlinks cannot escape), `speak` never overwrites a file unless `overwrite=true`, and only WAV audio is read. The tools, the `--voice` mode (speak and listen), the voice inbox, the Claude Code and Codex setup, and the safety notes are in [docs/agents-mcp.md](docs/agents-mcp.md).
 
 ### A local server for apps
 
@@ -265,54 +198,29 @@ curl -X POST --data-binary @sample.wav http://127.0.0.1:8765/v1/transcribe
 | `POST /v1/speak` | `{"text": "...", "voice": null}` | `audio/wav` |
 | `WS /v1/stream` | binary 16 kHz mono PCM frames; any text frame ends the stream | `{"text": "...", "final": false}` messages |
 
-| Flag | Default | Purpose |
-|---|---|---|
-| `--host` | `127.0.0.1` | Bind address. Anything else is refused without `--allow-remote`. |
-| `--port` | `8765` | Port |
-| `--no-warm` | off | Load engines on first use instead of at start-up (saves memory until needed, slower first request). |
-| `--allow-remote` | off | Allow a non-loopback address and any `Host`. **The server has no authentication.** |
+The server binds to `127.0.0.1` and refuses any other address without `--allow-remote`. It rejects requests that reach it under a foreign `Host` or `Origin` (DNS rebinding), caps uploads at 50 MB, runs one job per engine at a time, and answers `503` with `Retry-After: 1` when its queue is full. Flags, limits and error codes are in [docs/local-server.md](docs/local-server.md).
 
-The server defends against a web page reaching it under another name (DNS rebinding): a foreign `Host` gets 403 and a WebSocket from a foreign `Origin` is closed. Uploads are capped at 50 MB and streams at one hour. Each engine runs **one job at a time** (measured: concurrent jobs on one model are slower in total), up to 8 more requests wait, and the rest get `503` with `Retry-After: 1` immediately. Up to four live streams run at once; a fifth gets an error message and close code 1013. The recognizer model is loaded once and shared by all requests.
-
-> **Do not expose this server to a network you do not trust.** It has no authentication and no HTTPS.
+> **Do not expose this server to a network you do not trust.** On localhost it has no authentication. With `--allow-remote` it requires a random token (printed as a link when it starts), but there is still no HTTPS, so the token can be read by anyone who can watch the traffic.
 
 ### A page to test it in your browser
 
-`voxar serve` also serves a test page at its address. Open **http://127.0.0.1:8765**. It has two panels, **Listen** and **Speak**, and both fit on one screen. Everything runs on your machine. The fonts (Satoshi, Inter, Instrument Serif, Tajawal) load without blocking the page and fall back to system fonts offline.
+`voxar serve` also serves a test page at its address. Open **http://127.0.0.1:8765**. **Listen** transcribes a dropped audio file or streams it live (grey text is still being revised, black lines are final); **Speak** turns typed Arabic into audio you can play and download. The page works in English or العربية, in light or dark mode, and shows the exact commands to run if an engine is not installed. The browser converts audio to 16 kHz mono itself, so you do not need `ffmpeg` for it.
 
 <p align="center">
   <img src="docs/images/test-ui-desktop.png" width="720" alt="The voxar test page: a Listen panel with an Arabic transcript, and a Speak panel with sample sentences and an audio player"/>
 </p>
 
-**Everywhere**
-- **English or العربية.** The button at the top switches the whole page, including right-to-left layout, and the choice is remembered.
-- **Theme and text size.** *Theme* cycles auto, light and dark; **A-** and **A+** resize the transcript. Both are remembered.
-- **First-run help.** If the speech-to-text engine or the voice is not installed, the page shows the exact commands to run, each with a copy button, instead of a bare error.
-
-**Listen**
-- **Drop an audio file** (any format your browser can play) and it is transcribed in seconds, for example a 5.7 s clip in 0.34 s.
-- Tick *Play the file as live* to stream it to `WS /v1/stream` at the speed of speech: partial text appears while it plays (grey text is still being revised, black lines are final), with a level meter, a timer and "First text after 1.1 s". Press **Space** to start or stop.
-- Results from live, files and repeated drops collect on one stage, with **Copy text**, **Save text** (a `.txt` file that opens correctly in Windows Notepad) and **Clear**. **Esc** also stops a live session.
+<details><summary>Live mode, phone and dark mode</summary>
 
 <p align="center">
   <img src="docs/images/test-ui-live.png" width="720" alt="Live mode mid-stream: red Stop button with a pulsing dot, level meter, timer 0:12, one final black line and one grey line still changing"/>
-</p>
-
-**Speak**
-- Type Arabic (without full diacritics) and press **Speak** or **Ctrl/Cmd + Enter**, or click one of three **sample sentences** to speak it in one click. The audio plays and has a **Download WAV** link, and earlier clips stay below it so you can replay them, reuse their text or download them.
-
-<details><summary>Phone and dark mode</summary>
-
-<p align="center">
   <img src="docs/images/test-ui-phone.png" width="260" alt="The test page at phone width, panels stacked"/>
   <img src="docs/images/test-ui-dark.png" width="520" alt="The test page in dark mode"/>
 </p>
 
 </details>
 
-**Start-up.** `voxar serve` loads the engines in the background at start-up so the first click is fast (about 300 MB resident instead of about 30 MB until first use); pass `--no-warm` to load on first use instead. A newer Speak request cancels an older one still in flight, and the page never waits forever (requests time out with a clear message).
-
-The screenshots show real results (the sentence "الاجتماع غدا الساعة العاشرة صباحا في مكتب أرياض" transcribed from a synthetic voice). The browser converts any audio it can play to 16 kHz mono before sending it, so you do not need `ffmpeg` for this page.
+The screenshots show real results (the sentence "الاجتماع غدا الساعة العاشرة صباحا في مكتب أرياض" transcribed from a synthetic voice).
 
 ---
 
@@ -331,9 +239,7 @@ uv run voxar llm providers                            # language-model providers
 uv run voxar llm ask "مرحبا" --model MODEL_ID          # one message to a language model
 ```
 
-Convert any audio first with `ffmpeg -i input.m4a -ar 16000 -ac 1 -sample_fmt s16 sample.wav`.
-
-From Python:
+Every command and flag is listed in [docs/cli.md](docs/cli.md). Errors are a single `error: ...` line on stderr with exit code `2`. From Python:
 
 ```python
 import os
@@ -351,6 +257,7 @@ print(app.transcribe("sample.wav"))
 |---|---|---|---|
 | `moonshine-tiny-streaming-ar` | Arabic streaming speech-to-text | ~31 MB | MIT per its upstream repository, **unconfirmed for the downloaded file** |
 | `nabra-saudi-7m` | Saudi-dialect text-to-speech, one voice | ~31 MB | Apache-2.0 (weights); the plugin that runs it is GPL-3.0 |
+| `silero-vad` | Voice-activity detection (optional, extra `vad`) | ~2 MB | MIT |
 
 `voxar models pull` prints the license and refuses to continue without `--accept-license`.
 
@@ -363,7 +270,7 @@ These are the only configuration. There are no config files.
 | Variable | Meaning | Default |
 |---|---|---|
 | `VOXAR_CACHE_DIR` | Where models are stored | `$XDG_CACHE_HOME/voxar`, else `~/.cache/voxar` |
-| `VOXAR_OFFLINE` | `1`/`true`/`yes`/`on` forbids any download | off |
+| `VOXAR_OFFLINE` | `1`/`true`/`yes`/`on` forbids any download and blocks remote language-model providers | off |
 | `VOXAR_RECOGNIZER` | Speech-to-text engine name | `moonshine` |
 | `VOXAR_SYNTHESIZER` | Text-to-speech engine name | none (set `nabra-saudi` with the plugin) |
 | `VOXAR_LLM_PROVIDER` | Language-model provider ([list](docs/llm.md)) | `humain` |
@@ -376,18 +283,14 @@ API keys are read from the provider's own variable (for example `HUMAIN_NODE_API
 
 ## Privacy
 
-- **No telemetry**, no analytics, no phoning home.
-- **Audio never leaves your machine.** Recognition and synthesis run locally. The network is used by `voxar models pull`, which downloads model files over HTTPS from the model's publisher and verifies them, and by `voxar llm`, which sends **only the text you give it** to the provider you pick. Local providers (`ollama`, `lmstudio`) keep even that on your machine.
-- Set `VOXAR_OFFLINE=1` to make any download impossible and to block remote language-model providers.
-- The MCP server runs over stdio (no network). Its voice tools (`--voice`) use the microphone only while an agent's `listen` or `ask` call runs, and return text only. The HTTP server listens on loopback only unless you pass `--allow-remote`.
-- Audio can contain personal data. Do not attach recordings to bug reports.
+No telemetry, and audio never leaves your machine. The only network use is `voxar models pull` and `voxar llm`, described at the top. The MCP server runs over stdio, and its voice tools (`--voice`) use the microphone only while an agent's `listen` or `ask` call runs. Audio can contain personal data, so do not attach recordings to bug reports.
 
 ---
 
 ## Troubleshooting
 
 **`error: no recognizer named 'moonshine'` or `...needs an optional dependency`**
-The engine is an optional extra. Run `uv sync --extra moonshine` (or `uv pip install` the extra in your environment). `voxar doctor` lists what is installed.
+The engine is an optional extra. Run `uv sync --extra moonshine`. `voxar doctor` lists what is installed.
 
 **`error: model moonshine-tiny-streaming-ar@... is not installed. Run: voxar models pull ...`**
 Download it once: `voxar models pull moonshine-tiny-streaming-ar --accept-license`. If you set `VOXAR_CACHE_DIR`, use the same value for every command.
@@ -404,41 +307,11 @@ The Saudi voice speaks Arabic. Text made only of Latin letters or symbols produc
 **`error: sha256 mismatch`**
 A downloaded or cached file does not match the pinned hash. voxar deletes partial downloads. Re-run `voxar models pull`; if it persists, the upstream file may have changed, so please open an issue.
 
-**`error: refusing to listen on 0.0.0.0: the server has no authentication`**
-Use the default `127.0.0.1`. Pass `--allow-remote` only if you understand that anyone who can reach the port can use it.
+**`error: refusing to listen on 0.0.0.0: reachable from a network, the server would be protected only by a token and has no HTTPS`**
+Use the default `127.0.0.1`. Pass `--allow-remote` only on a network you trust (or through an SSH tunnel), and open the link with `?token=...` that `voxar serve` prints.
 
 **`voxar: command not found`**
 Run it through uv from the project folder: `uv run voxar ...`.
-
----
-
-## Full command reference
-
-```
-voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,llm,inbox,doctor} ...
-
-voxar transcribe sample.wav                    # FILE: 16 kHz mono 16-bit WAV
-voxar say "text" -o out.wav --voice af_msa     # --voice is engine-specific
-voxar say "text"                               # no -o: play on the speakers
-voxar models list
-voxar models pull moonshine-tiny-streaming-ar --accept-license
-voxar models verify moonshine-tiny-streaming-ar
-voxar mcp --allow-dir ./audio --allow-dir ./recordings   # repeat --allow-dir; default is the working directory
-voxar mcp --voice                              # let the agent speak and listen
-voxar inbox listen                             # speak to a running agent (press Enter, then talk)
-voxar inbox listen --always-on --wake WORD     # hands-free, only phrases containing WORD
-voxar inbox read                               # print and consume the spoken messages
-voxar inbox clear
-voxar serve --host 127.0.0.1 --port 8765
-voxar serve --host 0.0.0.0 --allow-remote      # no authentication: trusted networks only
-voxar llm providers
-voxar llm models --provider openrouter
-voxar llm ask "text" --provider humain --model MODEL_ID --system "..." --max-tokens 400 --no-stream
-voxar doctor
-voxar --version
-```
-
-Exit codes: `0` success, `2` any error (a single `error: ...` line on stderr).
 
 ---
 
@@ -447,8 +320,6 @@ Exit codes: `0` success, `2` any error (a single `error: ...` line on stderr).
 - [docs/](docs/index.md): quickstart, command line, Python API, MCP, local server, text-to-speech plugin, language models.
 - [ARCHITECTURE.md](ARCHITECTURE.md): ports and adapters, module rules, how to add an engine.
 - [Decisions](docs/adr/0001-ports-and-adapters.md) and the [threat model](docs/THREAT_MODEL.md).
-- [docs/performance.md](docs/performance.md): measured speed, memory and load.
-- [examples/](examples/README.md): eight runnable scripts with real output.
 - [CHANGELOG](CHANGELOG.md).
 
 ---

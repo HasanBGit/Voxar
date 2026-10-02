@@ -1,5 +1,6 @@
 """The public facade. Depends only on ports; engines arrive by injection or the registry."""
 
+import threading
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
@@ -36,6 +37,7 @@ class Voxar:
         self._recognizer_provider: Callable[[], SpeechRecognizer] | None = None
         self._synthesizer_provider: Callable[[], SpeechSynthesizer] | None = None
         self._chunk_ms = chunk_ms
+        self._creating = threading.Lock()  # a warm-up thread and a request must not both load
 
     @classmethod
     def from_config(cls, config: Config, registry: Registry | None = None) -> "Voxar":
@@ -93,8 +95,9 @@ class Voxar:
         write_wav(path, self.speak(text, voice=voice))
 
     def _require_recognizer(self) -> SpeechRecognizer:
-        if self._recognizer is None and self._recognizer_provider is not None:
-            self._recognizer = self._recognizer_provider()
+        with self._creating:
+            if self._recognizer is None and self._recognizer_provider is not None:
+                self._recognizer = self._recognizer_provider()
         if self._recognizer is None:
             raise EngineUnavailableError(
                 "no recognizer configured: set VOXAR_RECOGNIZER or pass one"
@@ -102,8 +105,9 @@ class Voxar:
         return self._recognizer
 
     def _require_synthesizer(self) -> SpeechSynthesizer:
-        if self._synthesizer is None and self._synthesizer_provider is not None:
-            self._synthesizer = self._synthesizer_provider()
+        with self._creating:
+            if self._synthesizer is None and self._synthesizer_provider is not None:
+                self._synthesizer = self._synthesizer_provider()
         if self._synthesizer is None:
             raise EngineUnavailableError(
                 "no synthesizer configured: set VOXAR_SYNTHESIZER (needs a TTS engine package)"
