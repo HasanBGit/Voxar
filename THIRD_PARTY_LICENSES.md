@@ -4,7 +4,7 @@ Policy: each component keeps its upstream license. We do not relicense anything.
 
 Checked 2026-10-02 against the model cards, Hugging Face API and Moonshine's `LICENSE`.
 
-## Used or planned (Moonshine and Nabra-Saudi-7M are used today; the others are planned)
+## Components
 
 | Component | Source | License | How it would be used | Notes |
 |---|---|---|---|---|

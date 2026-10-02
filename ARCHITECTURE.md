@@ -1,7 +1,5 @@
 # Architecture
 
-Status: the core, the Moonshine ASR engine, model download, and microphone input exist and are tested. The Saudi TTS plugin (`plugins/voxar-tts-espeak`, GPL-3.0, separate project) exists. The MCP server (`voxar.mcp_server`) and the optional local HTTP/WebSocket server (`voxar.server`) exist; both only call the facade. *(planned)* marks what is missing.
-
 ## Goal
 
 On-device, dialect-aware speech: streaming speech-to-text (STT) and text-to-speech (TTS), usable from Python, a CLI, an MCP server and an optional local server. Everything runs locally; audio never leaves the machine.
@@ -37,7 +35,7 @@ Dependencies point inwards: adapters depend on ports, never the reverse.
 | `voxar.ports` | `Protocol` interfaces | contain logic |
 | `voxar.config` | One frozen `Config` (env `VOXAR_*`, then arguments) | read config from anywhere else |
 | `voxar.models` | Model catalog (name, revision, SHA-256, license), cache, offline mode, safe loading | load untrusted pickles |
-| `voxar.audio` | WAV read/write and chunking (standard library only). Resampling is *(planned)* behind an optional extra | know about engines |
+| `voxar.audio` | WAV read/write and chunking (standard library only). | know about engines |
 | `voxar.engines.*` | One adapter per engine. Exists: `moonshine` (ASR). The TTS adapter lives in the separate GPL-3.0 plugin `plugins/voxar-tts-espeak`, registered through the `voxar.synthesizers` entry point | leak third-party types outward |
 | `voxar.net` | HTTPS-only streaming download for model files; the only module that uses the network | be imported by anything except the CLI |
 | `voxar.mic` | Microphone source (16 kHz mono int16 blocks) via `sounddevice`, bounded queue, Ctrl-C ends the stream cleanly | know about engines |

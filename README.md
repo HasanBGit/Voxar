@@ -24,7 +24,7 @@
   <img src="https://img.shields.io/badge/status-pre--alpha-orange" alt="Status: pre-alpha"/>
 </p>
 
-> **Pre-alpha.** Speed, memory and server load were measured on one machine: see [Performance](#performance-measured-on-one-machine) and [What has been checked](#what-has-been-checked).
+> **Pre-alpha.** Speed, memory and server load were measured on one machine: see [Performance](#performance-measured-on-one-machine).
 
 Run `voxar transcribe` on an audio file and Arabic speech becomes text on your own machine. Run `voxar say` and Saudi-dialect text becomes speech. Point an AI agent at `voxar mcp` and it can do both.
 
@@ -110,28 +110,15 @@ error: audio must be mono (got 2 channels); convert with: ffmpeg -i INPUT -ar 16
 
 ## What it does
 
-| Capability | What you get | Status |
-|---|---|---|
-| **Speech-to-text from a file** | `voxar transcribe` returns the final text | Works (Moonshine streaming Arabic) |
-| **Saudi-dialect text-to-speech** | `voxar say` writes a 24 kHz WAV, one female voice | Works via an optional **GPL-3.0** plugin that needs torch |
-| **MCP server for agents** | `transcribe_file`, `speak`, `list_engines` over stdio; file access confined to allowed directories | Works |
-| **Local HTTP/WebSocket server** | `POST /v1/transcribe`, `POST /v1/speak`, live `WS /v1/stream` | Works |
-| **Browser test page** | `voxar serve` serves a page at `/` to upload audio, stream it live, and type text to hear it | Works |
-| **Verified model downloads** | `voxar models pull/verify`: HTTPS only, pinned SHA-256, atomic install | Works |
-| **Engines as plugins** | Add an engine by registering an entry point; the core never imports it | Works (Moonshine and the Saudi voice use it) |
-
----
-
-## What has been checked
-
-| Area | Checked how |
+| Capability | What you get |
 |---|---|
-| Core, CLI, servers | Unit tests (98% line coverage), `ruff`, `mypy --strict`, `pip-audit` |
-| Speech-to-text | Real model on 14 synthetic clips; speed and memory measured; contract tests; 1 + 4 concurrent streams on one loaded model gave identical results |
-| Text-to-speech | Real model; speed and memory measured; Saudi sentences read back by the speech-to-text engine |
-| MCP and HTTP servers | Real stdio client, real HTTP and WebSocket clients, spoofed `Host` (403), foreign `Origin` refused; load-tested with 1 to 32 clients and 1 to 8 live streams |
-| Browser test page | 16-check script in headless Edge against the real server (see [A page to test it in your browser](#a-page-to-test-it-in-your-browser)) |
-| Install | Clean-environment install from the project folder, then every command in this README run against the real models |
+| **Speech-to-text from a file** | `voxar transcribe` returns the final text (Moonshine streaming Arabic) |
+| **Saudi-dialect text-to-speech** | `voxar say` writes a 24 kHz WAV, one female voice, through an optional **GPL-3.0** plugin that needs torch |
+| **MCP server for agents** | `transcribe_file`, `speak`, `list_engines` over stdio; file access confined to allowed directories |
+| **Local HTTP/WebSocket server** | `POST /v1/transcribe`, `POST /v1/speak`, live `WS /v1/stream` |
+| **Browser test page** | `voxar serve` serves a page at `/` to upload audio, stream it live, and type text to hear it |
+| **Verified model downloads** | `voxar models pull/verify`: HTTPS only, pinned SHA-256, atomic install |
+| **Engines as plugins** | Add an engine by registering an entry point; the core never imports it |
 
 ---
 
@@ -162,7 +149,7 @@ Partial text can still change (note "السلام علي" being revised); a fina
 
 ## Performance (measured on one machine)
 
-Apple M4 laptop, 10 cores, 16 GB, CPU only. Your numbers will differ; the methodology, the experiments that shaped the code, and the scripts to reproduce everything are in [docs/performance.md](docs/performance.md).
+Apple M4 laptop, 10 cores, 16 GB, CPU only. Your numbers will differ; the methodology and the scripts to reproduce everything are in [docs/performance.md](docs/performance.md).
 
 | What | Result |
 |---|---|
@@ -284,7 +271,7 @@ The server defends against a web page reaching it under another name (DNS rebind
 
 ### A page to test it in your browser
 
-`voxar serve` also serves a test page at its address. Open **http://127.0.0.1:8765**. It has two panels, **Listen** and **Speak**, and both fit on one screen. Everything runs on your machine, and the layout and fonts follow the clean style of [nabrah.ai](https://www.nabrah.ai/) (Satoshi headings, Inter body, Instrument Serif title, Tajawal for Arabic; they load without blocking the page and fall back to system fonts offline).
+`voxar serve` also serves a test page at its address. Open **http://127.0.0.1:8765**. It has two panels, **Listen** and **Speak**, and both fit on one screen. Everything runs on your machine. The fonts (Satoshi, Inter, Instrument Serif, Tajawal) load without blocking the page and fall back to system fonts offline.
 
 <p align="center">
   <img src="docs/images/test-ui-desktop.png" width="720" alt="The voxar test page: a Listen panel with an Arabic transcript, and a Speak panel with sample sentences and an audio player"/>
@@ -311,14 +298,9 @@ The server defends against a web page reaching it under another name (DNS rebind
 
 </details>
 
-**Faster by measurement** (Apple M4, headless Edge, 5 loads each):
-- The page paints in **56 ms** (median first contentful paint), down from 548 ms in the previous version, because the web-font stylesheets no longer block rendering.
-- `voxar serve` now loads the engines in the background at start-up, so the first click is fast: the first Speak request took **0.14 to 0.20 s** after start-up instead of about **3.0 s** when loaded on first use (3 fresh starts each). The cost is memory (about 300 MB resident instead of about 30 MB until first use); pass `--no-warm` to load on first use instead.
-- A newer Speak request cancels an older one still in flight, and the page never waits forever (requests time out with a clear message).
+**Start-up.** `voxar serve` loads the engines in the background at start-up so the first click is fast (about 300 MB resident instead of about 30 MB until first use); pass `--no-warm` to load on first use instead. A newer Speak request cancels an older one still in flight, and the page never waits forever (requests time out with a clear message).
 
 The screenshots show real results (the sentence "الاجتماع غدا الساعة العاشرة صباحا في مكتب أرياض" transcribed from a synthetic voice). The browser converts any audio it can play to 16 kHz mono before sending it, so you do not need `ffmpeg` for this page.
-
-**Tested:** a 16-check script drove the page in headless Edge against the real server (file drop, appending a second file, Clear, live from a file with the level meter and timer, Stop, keyboard shortcuts, sample chips, Ctrl+Enter, the empty-text message): 16 of 16 passed.
 
 ---
 
@@ -437,7 +419,7 @@ Exit codes: `0` success, `2` any error (a single `error: ...` line on stderr).
 - [docs/](docs/index.md): quickstart, command line, Python API, MCP, local server, text-to-speech plugin.
 - [ARCHITECTURE.md](ARCHITECTURE.md): ports and adapters, module rules, how to add an engine.
 - [Decisions](docs/adr/0001-ports-and-adapters.md) and the [threat model](docs/THREAT_MODEL.md).
-- [docs/performance.md](docs/performance.md): measured speed, memory, load and the experiments behind the design.
+- [docs/performance.md](docs/performance.md): measured speed, memory and load.
 - [examples/](examples/README.md): eight runnable scripts with real output.
 - [CHANGELOG](CHANGELOG.md).
 
@@ -458,4 +440,4 @@ Read these before any commercial use:
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and the rules (license tracking, claims backed by a measurement, tests for every change), [AGENTS.md](AGENTS.md) for coding agents, and [SUPPORT.md](SUPPORT.md) for bug reports. Security issues: [SECURITY.md](SECURITY.md).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and the rules (license tracking, claims backed by a measurement, tests for every change), and [SUPPORT.md](SUPPORT.md) for bug reports. Security issues: [SECURITY.md](SECURITY.md).

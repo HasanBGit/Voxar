@@ -1,5 +1,5 @@
 # training
 
-Fine-tune and distillation scripts. **Planned (milestones M3-M4); nothing is implemented yet.**
+Fine-tune and distillation scripts. Nothing is implemented here yet.
 
-Rules that apply from day one: only rights-cleared data (see [../DATA.md](../DATA.md): no source is "allowed" yet), no weights trained on a non-commercial or unclear source may ship, and no accuracy claim without a measurement on real speech.
+Rules for anything added here: use only rights-cleared data (see [../DATA.md](../DATA.md); no source is "allowed" yet), do not ship weights trained on a non-commercial or unclear source, and make no accuracy claim without a measurement on real speech.

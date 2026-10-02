@@ -35,4 +35,4 @@ curl -X POST --data-binary @sample.wav http://127.0.0.1:8765/v1/transcribe
 - **Limits:** uploads up to 50 MB and streams up to one hour. Each engine runs one job at a time (measured: concurrent jobs on one model are slower in total); up to 8 more requests wait, and further ones get `503` with `Retry-After: 1` at once, so clients should back off and retry (see `examples/04_http_client.py`). Up to four live streams run at once; a fifth gets `{"error": ...}` and is closed with code 1013 (try again later).
 - The recognizer model is loaded once and shared by all requests and streams. Engines load in the background when the server starts, so the first request is fast (first Speak 0.14 to 0.20 s instead of about 3.0 s when loaded on first use, measured over 3 fresh starts); `voxar serve --no-warm` loads them on first use instead, which saves about 270 MB of memory until then.
 
-Not done: authentication, HTTPS, per-client limits.
+The server has no authentication, HTTPS or per-client limits.
