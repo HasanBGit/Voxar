@@ -30,8 +30,11 @@ jobs:
           plugins/voxar-tts-espeak/src plugins/voxar-tts-espeak/tests
           --exclude _vendor
 
+  # Needs the repository's Dependency graph (and GitHub Advanced Security on a private repository):
+  # Settings > Code security. Until that is on, GitHub rejects every run, so the job waits for the
+  # repository variable DEPENDENCY_REVIEW=true (Settings > Secrets and variables > Actions > Variables).
   dependency-review:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && vars.DEPENDENCY_REVIEW == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

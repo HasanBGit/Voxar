@@ -40,6 +40,8 @@ def load_backend(model_dir: Path) -> Backend:
         config=str(model_dir / _CONFIG), model=str(model_dir / _WEIGHTS), disable_complex=True
     ).eval()
     model.vocab.update(EXTRA_SYMBOLS)
+    # weights_only=True limits loading to plain tensors, so a tampered file cannot run code
+    # nosemgrep: trailofbits.python.pickles-in-pytorch.pickles-in-pytorch
     pack = torch.load(model_dir / _VOICE, map_location="cpu", weights_only=True)
     g2p = ArabicG2P(diacritize=False)  # dialect text is used as written, without tashkeel
 

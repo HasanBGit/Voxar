@@ -207,6 +207,8 @@ def _install_http_routes(
 
 
 def _install_ui_route(api: "FastAPI") -> None:
+    # voxar needs Python 3.10+, so the rule that asks for the importlib_resources backport is moot
+    # nosemgrep: python.lang.compatibility.python37.python37-compatibility-importlib2
     from importlib.resources import files
 
     from fastapi.responses import HTMLResponse

@@ -13,6 +13,7 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     permissions:
+      actions: read          # CodeQL reads the workflow run (needed in private repositories)
       contents: read
       security-events: write
     steps:
