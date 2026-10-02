@@ -10,6 +10,7 @@
 - `voxar serve`: local FastAPI server (`voxar[server]`) with `POST /v1/transcribe`, `POST /v1/speak` and live `WS /v1/stream`. Loopback-only unless `--allow-remote`; Host/Origin guard against DNS rebinding; upload, stream and concurrency limits (one job per engine at a time, a queue of 8, then `503` with `Retry-After`; 4 live streams, then close code 1013). Engines load in the background at start-up (`--no-warm` to opt out).
 - Browser test page at `/` (`voxar/ui/index.html`, single file, no build step): drop or stream audio to transcribe, type text to hear the Saudi voice, copy and download buttons, dark mode, phone layout.
 - Long audio is transcribed in 2 s chunks (100 ms chunks up to 15 s); an explicit `chunk_ms` always wins.
+- `voxar llm` and `voxar.llm`: chat clients for HUMAIN Node (default), OpenRouter, OpenAI, Anthropic, Groq, Together, Mistral, Gemini, Ollama, LM Studio and any OpenAI-compatible server; `providers`, `models` and `ask` commands; settings `VOXAR_LLM_PROVIDER`, `VOXAR_LLM_MODEL`, `VOXAR_LLM_BASE_URL`. Keys come from environment variables only, https is required except for loopback, redirects are refused, and `VOXAR_OFFLINE=1` blocks remote providers. Tested against a local fake server only.
 - Eight example scripts in `examples/`.
 - Benchmark and load-test scripts (`scripts/benchmark.py`, `scripts/loadtest.py`); results in `docs/performance.md`.
 - `Makefile` with `make setup`, `make models`, `make run`, `make test`, `make check`.

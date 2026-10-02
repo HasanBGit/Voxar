@@ -1,7 +1,7 @@
 # Command line
 
 ```text
-voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,doctor} ...
+voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,llm,doctor} ...
 ```
 
 Errors are printed as `error: <message>` with exit code 2 and never as a traceback. Messages say how to fix the problem.
@@ -16,6 +16,9 @@ Errors are printed as `error: <message>` with exit code 2 and never as a traceba
 | `voxar models verify NAME` | Re-check an installed model's checksums. |
 | `voxar mcp [--allow-dir DIR]...` | Run the MCP server on stdio. See [Agents (MCP)](agents-mcp.md). |
 | `voxar serve [--host H] [--port P] [--allow-remote]` | Run the local HTTP/WebSocket server. See [Local server](local-server.md). |
+| `voxar llm providers` | List language-model providers and whether each key is set. See [Language models](llm.md). |
+| `voxar llm models [--provider P]` | List the models your key can use. |
+| `voxar llm ask TEXT [--provider P] [--model M] [--system S] [--no-stream]` | Send one message and print the reply. |
 | `voxar doctor` | Show versions, cache directory and installed engines. |
 
 ## Models

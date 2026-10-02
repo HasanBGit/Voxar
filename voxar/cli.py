@@ -14,6 +14,7 @@ import voxar
 from voxar.api import Voxar
 from voxar.config import Config
 from voxar.domain import AudioChunk, EngineUnavailableError, TranscriptEvent, VoxarError
+from voxar.llm import PROVIDERS, ChatClient, Message, client_from_config
 from voxar.mic import mic_chunks
 from voxar.models import CATALOG, Fetcher, ModelSpec, ModelStore
 from voxar.net import fetcher_for as https_fetcher_for
@@ -26,6 +27,7 @@ FetcherFactory = Callable[[ModelSpec], Fetcher]
 MicSource = Callable[[], Iterable[AudioChunk]]
 ServeMcp = Callable[[Voxar, Sequence[Path], Callable[[], dict[str, list[str]]]], None]
 ServeHttp = Callable[[Voxar, Callable[[], dict[str, list[str]]], str, int, bool, bool], None]
+LlmFactory = Callable[..., ChatClient]
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
@@ -39,6 +41,8 @@ class _Context:
     mic: MicSource
     serve_mcp: ServeMcp
     serve_http: ServeHttp
+    llm: LlmFactory
+    env: Mapping[str, str]
     out: TextIO
 
 
@@ -142,6 +146,22 @@ def _parser() -> argparse.ArgumentParser:
         help="allow binding a non-loopback address (the server has NO authentication)",
     )
 
+    llm = commands.add_parser("llm", help="talk to a language model (HUMAIN Node, OpenRouter, ...)")
+    llm_commands = llm.add_subparsers(dest="llm_command", required=True)
+    llm_commands.add_parser("providers", help="list providers and whether their API key is set")
+    llm_models = llm_commands.add_parser("models", help="list the models a provider offers you")
+    ask = llm_commands.add_parser("ask", help="send one message and print the reply")
+    ask.add_argument("text", help="what to say to the model")
+    ask.add_argument("--system", help="system prompt (default: none)")
+    ask.add_argument("--max-tokens", type=int, default=400, help="longest reply (default: 400)")
+    ask.add_argument("--no-stream", action="store_true", help="print the reply when it is complete")
+    for sub in (llm_models, ask):
+        sub.add_argument(
+            "--provider", choices=sorted(PROVIDERS), help="default: VOXAR_LLM_PROVIDER"
+        )
+        sub.add_argument("--base-url", help="override the provider's URL (https, or localhost)")
+    ask.add_argument("--model", help="model id; default: VOXAR_LLM_MODEL or the provider's default")
+
     commands.add_parser("doctor", help="show environment and available engines")
     return parser
 
@@ -155,6 +175,7 @@ def main(
     mic: MicSource | None = None,
     serve_mcp: ServeMcp | None = None,
     serve_http: ServeHttp | None = None,
+    llm: LlmFactory | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
@@ -167,13 +188,16 @@ def main(
         print("error: a command is required", file=err)
         return EXIT_ERROR
     try:
+        environment = env if env is not None else os.environ
         context = _Context(
-            config=Config.from_env(env if env is not None else os.environ),
+            config=Config.from_env(environment),
             registry=registry or Registry(),
             fetcher_for=fetcher_for or https_fetcher_for,
             mic=mic or mic_chunks,
             serve_mcp=serve_mcp or _serve_mcp,
             serve_http=serve_http or _serve_http,
+            llm=llm or client_from_config,
+            env=environment,
             out=out,
         )
         _run(args, context)
@@ -198,6 +222,8 @@ def _run(args: argparse.Namespace, ctx: _Context) -> None:
         _serve(args, ctx)
     elif args.command == "models":
         _models(args, ctx)
+    elif args.command == "llm":
+        _llm(args, ctx)
     elif args.command == "doctor":
         _doctor(ctx)
 
@@ -235,6 +261,41 @@ def _show(event: TranscriptEvent, out: TextIO, *, live: bool) -> None:
     elif live:
         out.write(f"\r\x1b[K{event.text}")
         out.flush()
+
+
+def _llm(args: argparse.Namespace, ctx: _Context) -> None:
+    if args.llm_command == "providers":
+        for provider in PROVIDERS.values():
+            key = provider.key_env
+            status = (
+                "no key needed"
+                if key is None or provider.local
+                else (f"{key} ({'set' if ctx.env.get(key) else 'not set'})")
+            )
+            where = "on this machine" if provider.local else "remote"
+            print(f"{provider.name:<11} {where:<16} {status}", file=ctx.out)
+        return
+    client = ctx.llm(
+        ctx.config,
+        ctx.env,
+        provider=args.provider,
+        model=getattr(args, "model", None),
+        base_url=args.base_url,
+        need_model=args.llm_command == "ask",
+    )
+    if args.llm_command == "models":
+        for name in client.models():
+            print(name, file=ctx.out)
+        return
+    turns = [Message("user", args.text)]
+    options = {"system": args.system, "max_tokens": args.max_tokens}
+    if args.no_stream:
+        print(client.reply(turns, **options), file=ctx.out)
+        return
+    for piece in client.stream(turns, **options):
+        ctx.out.write(piece)
+        ctx.out.flush()
+    ctx.out.write("\n")
 
 
 def _models(args: argparse.Namespace, ctx: _Context) -> None:

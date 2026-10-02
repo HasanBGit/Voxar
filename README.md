@@ -26,9 +26,9 @@
 
 > **Pre-alpha.** Speed, memory and server load were measured on one machine: see [Performance](#performance-measured-on-one-machine).
 
-Run `voxar transcribe` on an audio file and Arabic speech becomes text on your own machine. Run `voxar say` and Saudi-dialect text becomes speech. Point an AI agent at `voxar mcp` and it can do both.
+Run `voxar transcribe` on an audio file and Arabic speech becomes text on your own machine. Run `voxar say` and Saudi-dialect text becomes speech. Point an AI agent at `voxar mcp` and it can do both, and `voxar llm` talks to the language model for a spoken conversation.
 
-- **On-device and private.** Models run locally. No audio is sent anywhere, and there is no telemetry. The only network use is the explicit `voxar models pull` download.
+- **On-device and private.** The speech models run locally. No audio is sent anywhere, and there is no telemetry. The network is used only for the explicit `voxar models pull` download and, if you run `voxar llm`, for the text you send to the language-model provider you choose (a local one such as Ollama keeps it on your machine).
 - **Every model is verified.** Downloads are HTTPS-only, and every file is checked against a pinned SHA-256 before it is used. A bad or interrupted download never looks installed.
 - **Small and dependency-free core.** The Apache-2.0 core has no runtime dependencies. Engines, the MCP server and the HTTP server are optional extras, and text-to-speech is a separate GPL-3.0 plugin on purpose (see [Licensing](#licensing)).
 
@@ -115,6 +115,7 @@ error: audio must be mono (got 2 channels); convert with: ffmpeg -i INPUT -ar 16
 | **Speech-to-text from a file** | `voxar transcribe` returns the final text (Moonshine streaming Arabic) |
 | **Saudi-dialect text-to-speech** | `voxar say` writes a 24 kHz WAV, one female voice, through an optional **GPL-3.0** plugin that needs torch |
 | **MCP server for agents** | `transcribe_file`, `speak`, `list_engines` over stdio; file access confined to allowed directories |
+| **Language models** | `voxar llm ask/models/providers`: HUMAIN Node (default), OpenRouter, OpenAI, Anthropic, Groq, Together, Mistral, Gemini, Ollama, LM Studio or any compatible server |
 | **Local HTTP/WebSocket server** | `POST /v1/transcribe`, `POST /v1/speak`, live `WS /v1/stream` |
 | **Browser test page** | `voxar serve` serves a page at `/` to upload audio, stream it live, and type text to hear it |
 | **Verified model downloads** | `voxar models pull/verify`: HTTPS only, pinned SHA-256, atomic install |
@@ -315,6 +316,8 @@ uv run voxar models pull moonshine-tiny-streaming-ar --accept-license
 uv run voxar models verify moonshine-tiny-streaming-ar
 uv run voxar mcp --allow-dir ./audio                  # MCP server on stdio
 uv run voxar serve --port 8765                        # local HTTP/WebSocket server
+uv run voxar llm providers                            # language-model providers and key status
+uv run voxar llm ask "مرحبا" --model MODEL_ID          # one message to a language model
 ```
 
 Convert any audio first with `ffmpeg -i input.m4a -ar 16000 -ac 1 -sample_fmt s16 sample.wav`.
@@ -352,14 +355,19 @@ These are the only configuration. There are no config files.
 | `VOXAR_OFFLINE` | `1`/`true`/`yes`/`on` forbids any download | off |
 | `VOXAR_RECOGNIZER` | Speech-to-text engine name | `moonshine` |
 | `VOXAR_SYNTHESIZER` | Text-to-speech engine name | none (set `nabra-saudi` with the plugin) |
+| `VOXAR_LLM_PROVIDER` | Language-model provider ([list](docs/llm.md)) | `humain` |
+| `VOXAR_LLM_MODEL` | Language-model id | the provider's default, if any |
+| `VOXAR_LLM_BASE_URL` | Replace the provider's URL (https, or localhost) | the provider's URL |
+
+API keys are read from the provider's own variable (for example `HUMAIN_NODE_API_KEY`), never from a file.
 
 ---
 
 ## Privacy
 
 - **No telemetry**, no analytics, no phoning home.
-- **Audio never leaves your machine.** Recognition and synthesis run locally. The only network use is `voxar models pull`, which downloads model files over HTTPS from the model's publisher and verifies them.
-- Set `VOXAR_OFFLINE=1` to make any download impossible.
+- **Audio never leaves your machine.** Recognition and synthesis run locally. The network is used by `voxar models pull`, which downloads model files over HTTPS from the model's publisher and verifies them, and by `voxar llm`, which sends **only the text you give it** to the provider you pick. Local providers (`ollama`, `lmstudio`) keep even that on your machine.
+- Set `VOXAR_OFFLINE=1` to make any download impossible and to block remote language-model providers.
 - The MCP server runs over stdio (no network). The HTTP server listens on loopback only unless you pass `--allow-remote`.
 - Audio can contain personal data. Do not attach recordings to bug reports.
 
@@ -396,7 +404,7 @@ Run it through uv from the project folder: `uv run voxar ...`.
 ## Full command reference
 
 ```
-voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,doctor} ...
+voxar [-h] [--version] {transcribe,listen,say,models,mcp,serve,llm,doctor} ...
 
 voxar transcribe sample.wav                    # FILE: 16 kHz mono 16-bit WAV
 voxar say "text" -o out.wav --voice af_msa     # -o is required; --voice is engine-specific
@@ -406,6 +414,9 @@ voxar models verify moonshine-tiny-streaming-ar
 voxar mcp --allow-dir ./audio --allow-dir ./recordings   # repeat --allow-dir; default is the working directory
 voxar serve --host 127.0.0.1 --port 8765
 voxar serve --host 0.0.0.0 --allow-remote      # no authentication: trusted networks only
+voxar llm providers
+voxar llm models --provider openrouter
+voxar llm ask "text" --provider humain --model MODEL_ID --system "..." --max-tokens 400 --no-stream
 voxar doctor
 voxar --version
 ```
@@ -416,7 +427,7 @@ Exit codes: `0` success, `2` any error (a single `error: ...` line on stderr).
 
 ## Learn more
 
-- [docs/](docs/index.md): quickstart, command line, Python API, MCP, local server, text-to-speech plugin.
+- [docs/](docs/index.md): quickstart, command line, Python API, MCP, local server, text-to-speech plugin, language models.
 - [ARCHITECTURE.md](ARCHITECTURE.md): ports and adapters, module rules, how to add an engine.
 - [Decisions](docs/adr/0001-ports-and-adapters.md) and the [threat model](docs/THREAT_MODEL.md).
 - [docs/performance.md](docs/performance.md): measured speed, memory and load.

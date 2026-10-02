@@ -37,6 +37,7 @@ Environment variables (the only configuration):
 | `VOXAR_OFFLINE` | `1`/`true` forbids downloads | off |
 | `VOXAR_RECOGNIZER` | speech-to-text engine name | `moonshine` |
 | `VOXAR_SYNTHESIZER` | text-to-speech engine name | none (set to `nabra-saudi` with the plugin) |
+| `VOXAR_LLM_PROVIDER`, `VOXAR_LLM_MODEL`, `VOXAR_LLM_BASE_URL` | language model, see [Language models](llm.md) | `humain`, the provider's default, the provider's URL |
 
 ## Use it from Python
 

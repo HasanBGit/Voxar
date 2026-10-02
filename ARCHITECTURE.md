@@ -2,7 +2,7 @@
 
 ## Goal
 
-On-device, dialect-aware speech: streaming speech-to-text (STT) and text-to-speech (TTS), usable from Python, a CLI, an MCP server and an optional local server. Everything runs locally; audio never leaves the machine.
+On-device, dialect-aware speech: streaming speech-to-text (STT) and text-to-speech (TTS), usable from Python, a CLI, an MCP server and an optional local server. Speech runs locally and audio never leaves the machine; an optional language-model step sends only text, to a provider you choose.
 
 ## Shape: ports and adapters
 
@@ -39,6 +39,7 @@ Dependencies point inwards: adapters depend on ports, never the reverse.
 | `voxar.engines.*` | One adapter per engine. Exists: `moonshine` (ASR). The TTS adapter lives in the separate GPL-3.0 plugin `plugins/voxar-tts-espeak`, registered through the `voxar.synthesizers` entry point | leak third-party types outward |
 | `voxar.net` | HTTPS-only streaming download for model files; the only module that uses the network | be imported by anything except the CLI |
 | `voxar.mic` | Microphone source (16 kHz mono int16 blocks) via `sounddevice`, bounded queue, Ctrl-C ends the stream cleanly | know about engines |
+| `voxar.llm` | Chat clients for the language model (OpenAI-style and Anthropic protocols, standard library only); https except loopback, no redirects, keys from the environment only. The only module besides `voxar.net` that uses the network | be imported by the core facade, print a key, or follow a redirect |
 | `voxar.registry` | Look up engines through entry points `voxar.recognizers` / `voxar.synthesizers` | import engines eagerly |
 | `voxar.api` | Small public facade | hold global state |
 | `voxar.mcp_server` | MCP tools for agents; confines file paths to allowed directories; turns our errors into tool errors | print to stdout (it is the protocol channel) |

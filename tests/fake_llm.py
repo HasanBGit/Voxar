@@ -25,7 +25,9 @@ class FakeLLMServer:
                 raw = self.rfile.read(length) if length else b""
                 body = json.loads(raw) if raw else {}
                 headers = {k.lower(): v for k, v in self.headers.items()}
-                outer.requests.append({"method": self.command, "path": self.path, "body": body, "headers": headers})
+                outer.requests.append(
+                    {"method": self.command, "path": self.path, "body": body, "headers": headers}
+                )
                 status, extra, payload = responder(self.path, body, headers)
                 self.send_response(status)
                 for key, value in extra.items():
@@ -58,7 +60,11 @@ def sse_reply(events: Iterator[str]) -> Reply:
 
 
 def openai_message(content: str | None, **extra: Any) -> dict[str, Any]:
-    return {"choices": [{"message": {"role": "assistant", "content": content, **extra}, "finish_reason": "stop"}]}
+    return {
+        "choices": [
+            {"message": {"role": "assistant", "content": content, **extra}, "finish_reason": "stop"}
+        ]
+    }
 
 
 def openai_stream(pieces: list[str]) -> Iterator[str]:

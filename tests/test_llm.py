@@ -41,25 +41,35 @@ def test_reply_sends_the_documented_request_and_returns_the_content() -> None:
         {"role": "user", "content": "مرحبا"},
     ]
     assert sent["headers"]["authorization"] == f"Bearer {KEY}"
-    assert sent["headers"]["user-agent"].startswith("voxar/")  # gateways block the default Python agent
+    assert sent["headers"]["user-agent"].startswith(
+        "voxar/"
+    )  # gateways block the default Python agent
 
 
 def test_reasoning_content_is_never_spoken() -> None:
-    with FakeLLMServer(lambda *_: json_reply(openai_message("الجواب", reasoning_content="thinking..."))) as s:
+    with FakeLLMServer(
+        lambda *_: json_reply(openai_message("الجواب", reasoning_content="thinking..."))
+    ) as s:
         assert client(s).reply(HELLO) == "الجواب"
 
 
 @pytest.mark.parametrize("content", [None, "", "   "])
 def test_an_empty_reply_is_an_error_not_silence(content: str | None) -> None:
-    with FakeLLMServer(lambda *_: json_reply(openai_message(content))) as server:
-        with pytest.raises(LLMError, match="empty reply"):
-            client(server).reply(HELLO)
+    with (
+        FakeLLMServer(lambda *_: json_reply(openai_message(content))) as server,
+        pytest.raises(LLMError, match="empty reply"),
+    ):
+        client(server).reply(HELLO)
 
 
 def test_unparseable_responses_are_reported() -> None:
-    with FakeLLMServer(lambda *_: (200, {"Content-Type": "text/html"}, b"<html>oops</html>")) as server:
-        with pytest.raises(LLMError, match="unexpected response"):
-            client(server).reply(HELLO)
+    with (
+        FakeLLMServer(
+            lambda *_: (200, {"Content-Type": "text/html"}, b"<html>oops</html>")
+        ) as server,
+        pytest.raises(LLMError, match="unexpected response"),
+    ):
+        client(server).reply(HELLO)
 
 
 @pytest.mark.parametrize(
@@ -76,21 +86,29 @@ def test_unparseable_responses_are_reported() -> None:
 def test_http_errors_become_actionable_messages(
     status: int, headers: dict[str, str], expected: str
 ) -> None:
-    with FakeLLMServer(lambda *_: json_reply({"error": {"message": "boom"}}, status, **headers)) as s:
-        with pytest.raises(LLMError, match=expected) as info:
-            client(s).reply(HELLO)
+    with (
+        FakeLLMServer(
+            lambda *_: json_reply({"error": {"message": "boom"}}, status, **headers)
+        ) as s,
+        pytest.raises(LLMError, match=expected) as info,
+    ):
+        client(s).reply(HELLO)
     assert KEY not in str(info.value)  # the key must never reach an error message
 
 
 def test_a_bad_request_shows_the_providers_reason() -> None:
     body = {"error": {"message": "Unsupported parameter(s): `reasoning`"}}
-    with FakeLLMServer(lambda *_: json_reply(body, 400)) as server:
-        with pytest.raises(LLMError, match="Unsupported parameter"):
-            client(server).reply(HELLO)
+    with (
+        FakeLLMServer(lambda *_: json_reply(body, 400)) as server,
+        pytest.raises(LLMError, match="Unsupported parameter"),
+    ):
+        client(server).reply(HELLO)
 
 
 def test_connection_failure_says_what_to_check() -> None:
-    dead = ChatClient(provider_named("ollama"), model="m", base_url="http://127.0.0.1:9/v1", api_key=None)
+    dead = ChatClient(
+        provider_named("ollama"), model="m", base_url="http://127.0.0.1:9/v1", api_key=None
+    )
     with pytest.raises(LLMError, match="Ollama"):
         dead.reply(HELLO)
 
@@ -111,7 +129,9 @@ def test_models_lists_ids_from_the_provider() -> None:
 
 def test_anthropic_uses_its_own_protocol() -> None:
     def responder(path: str, body: dict[str, Any], headers: dict[str, str]) -> Reply:
-        return json_reply({"content": [{"type": "text", "text": "مرحبا بك"}, {"type": "text", "text": "!"}]})
+        return json_reply(
+            {"content": [{"type": "text", "text": "مرحبا بك"}, {"type": "text", "text": "!"}]}
+        )
 
     with FakeLLMServer(responder) as server:
         text = client(server, "anthropic").reply(HELLO, system="sys")
@@ -133,11 +153,15 @@ def test_anthropic_stream() -> None:
 
 def test_remote_providers_must_use_https() -> None:
     with pytest.raises(ConfigError, match="https"):
-        ChatClient(provider_named("custom"), model="m", base_url="http://example.com/v1", api_key=KEY)
+        ChatClient(
+            provider_named("custom"), model="m", base_url="http://example.com/v1", api_key=KEY
+        )
 
 
 def test_http_is_allowed_for_loopback_only() -> None:
-    ChatClient(provider_named("ollama"), model="m", base_url="http://localhost:11434/v1", api_key=None)
+    ChatClient(
+        provider_named("ollama"), model="m", base_url="http://localhost:11434/v1", api_key=None
+    )
     ChatClient(provider_named("ollama"), model="m", base_url="http://[::1]:11434/v1", api_key=None)
 
 
