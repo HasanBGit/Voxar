@@ -109,7 +109,7 @@ def main(argv: list[str]) -> int:
         stale = [
             name
             for name, text in expected.items()
-            if not (ASSETS / name).exists() or (ASSETS / name).read_text() != text
+            if not (ASSETS / name).exists() or (ASSETS / name).read_text(encoding="utf-8") != text
         ]
         for name in stale:
             print(
@@ -118,7 +118,7 @@ def main(argv: list[str]) -> int:
         return 1 if stale else 0
     ASSETS.mkdir(exist_ok=True)
     for name, text in expected.items():
-        (ASSETS / name).write_text(text)
+        (ASSETS / name).write_text(text, encoding="utf-8")
         print(f"wrote assets/{name}")
     return 0
 

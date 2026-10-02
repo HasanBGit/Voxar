@@ -160,7 +160,7 @@ def main(argv: list[str]) -> int:
     tts.add_argument("--repeat", type=int, default=1)
     args = parser.parse_args(argv)
     if args.kind == "asr":
-        refs = json.loads(args.refs.read_text()) if args.refs else {}
+        refs = json.loads(args.refs.read_text(encoding="utf-8")) if args.refs else {}
         bench_asr(args.clips, refs, args.repeat)
     else:
         bench_tts(args.texts, args.repeat)

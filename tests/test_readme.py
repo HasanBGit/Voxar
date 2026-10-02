@@ -20,7 +20,7 @@ ASSET = re.compile(r'(?:src|srcset)="(?P<target>[^"]+)"')
 
 
 def code_blocks(path: Path) -> list[str]:
-    return [block.strip("\n") for block in FENCE.findall(path.read_text())]
+    return [block.strip("\n") for block in FENCE.findall(path.read_text(encoding="utf-8"))]
 
 
 def voxar_commands(path: Path) -> list[str]:
@@ -51,7 +51,7 @@ def test_every_voxar_command_in_the_readme_parses_against_the_real_cli(path: Pat
 @pytest.mark.parametrize("path", READMES, ids=lambda p: p.parent.name + "/" + p.name)
 def test_relative_links_point_to_files_that_exist(path: Path) -> None:
     missing = []
-    for match in LINK.finditer(path.read_text()):
+    for match in LINK.finditer(path.read_text(encoding="utf-8")):
         target = match.group("target")
         if re.match(r"^[a-z]+:", target) or target.startswith("#"):
             continue
@@ -61,7 +61,7 @@ def test_relative_links_point_to_files_that_exist(path: Path) -> None:
 
 
 def test_in_page_anchors_resolve_in_the_english_readme() -> None:
-    text = ENGLISH.read_text()
+    text = ENGLISH.read_text(encoding="utf-8")
     headings = {
         re.sub(r"[^\w\s-]", "", h.lower()).strip().replace(" ", "-")
         for h in re.findall(r"^#{1,6} (.+)$", text, re.MULTILINE)
@@ -77,7 +77,7 @@ def test_the_arabic_readme_cannot_drift_from_the_english_code_blocks() -> None:
 
 
 def test_the_readme_has_no_claims_about_things_that_do_not_exist() -> None:
-    text = ENGLISH.read_text().lower()
+    text = ENGLISH.read_text(encoding="utf-8").lower()
     for fake in ("trendshift", "pypi.org/project", "discord.gg", "y combinator", "contrib.rocks"):
         assert fake not in text
 
@@ -86,7 +86,7 @@ def test_the_readme_has_no_claims_about_things_that_do_not_exist() -> None:
 def test_images_referenced_by_the_readme_exist(path: Path) -> None:
     local = [
         m.group("target")
-        for m in ASSET.finditer(path.read_text())
+        for m in ASSET.finditer(path.read_text(encoding="utf-8"))
         if not re.match(r"^[a-z]+:", m.group("target"))
     ]
     assert local, "expected the README to show the logo"
@@ -96,7 +96,7 @@ def test_images_referenced_by_the_readme_exist(path: Path) -> None:
 def test_links_in_the_examples_index_exist() -> None:
     index = ROOT / "examples" / "README.md"
     missing = []
-    for match in LINK.finditer(index.read_text()):
+    for match in LINK.finditer(index.read_text(encoding="utf-8")):
         target = match.group("target")
         if re.match(r"^[a-z]+:", target) or target.startswith("#"):
             continue

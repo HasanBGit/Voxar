@@ -317,6 +317,7 @@ def test_the_pages_javascript_is_syntactically_valid() -> None:
         input=script,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
